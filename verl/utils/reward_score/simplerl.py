@@ -1,5 +1,8 @@
 import torch
 import re
+import ray
+from ray.exceptions import GetTimeoutError
+
 from multiprocessing import Process, Queue
 from .simplerl_utils.paser import extract_answer as qwen_extract_answer
 from .simplerl_utils.grader import math_equal as qwen_math_equal
@@ -27,6 +30,19 @@ def qwen_math_equal_subprocess(prediction, reference,  timeout_seconds=10):
         return q.get_nowait()
     except:
         return False   
+
+def qwen_math_equal_with_timeout_ray(prediction, reference, include_percentage=True, is_close=True, timeout_duration=3):
+    @ray.remote
+    def _remote_qwen_math_equal(prediction, reference, include_percentage, is_close):
+        return qwen_math_equal(prediction, reference, include_percentage, is_close, timeout=False)
+    
+    try:
+        future = _remote_qwen_math_equal.remote(prediction, reference, include_percentage, is_close)
+        result = ray.get(future, timeout=timeout_duration)
+        return result
+    except (GetTimeoutError, Exception) as e:
+        ray.logger.info("Math Eq eval timeout.")
+        return False
 
 def preprocess_box_response_for_qwen_prompt(model_output, answer):
     # breakpoint()
@@ -63,7 +79,7 @@ def preprocess_box_response_for_qwen_prompt(model_output, answer):
 
     # processed_solution = re.sub(r"<\|end_of_text\|>", "", processed_solution)
     
-    if qwen_math_equal_subprocess(prediction=extract_answer, reference=answer):
+    if qwen_math_equal_with_timeout_ray(prediction=extract_answer, reference=answer):
         box_match = 1.0
     else:
         box_match = -0.5
