@@ -15,11 +15,12 @@
 Note that we don't combine the main with ray_trainer as ray_trainer is used by other main.
 """
 
-from verl import DataProto
+import ray
+import hydra
 import torch
+from verl import DataProto
 from verl.utils.reward_score import gsm8k, math, simplerl
 from verl.trainer.ppo.ray_trainer import RayPPOTrainer
-
 
 def _default_compute_score(data_source, solution_str, ground_truth):
     if data_source == 'openai/gsm8k':
@@ -90,11 +91,6 @@ class RewardManager():
 
         return reward_tensor
 
-
-import ray
-import hydra
-
-
 @hydra.main(config_path='config', config_name='ppo_trainer', version_base=None)
 def main(config):
     run_ppo(config)
@@ -108,11 +104,9 @@ def run_ppo(config, compute_score=None):
     ray.get(main_task.remote(config, compute_score))
 
 
-@ray.remote
+@ray.remote(num_cpus=1)  # please make sure main_task is not scheduled on head
 def main_task(config, compute_score=None):
     from verl.utils.fs import copy_local_path_from_hdfs
-    from transformers import AutoTokenizer
-
     # print initial config
     from pprint import pprint
     from omegaconf import OmegaConf
@@ -176,10 +170,19 @@ def main_task(config, compute_score=None):
         role_worker_mapping[Role.RewardModel] = ray.remote(RewardModelWorker)
         mapping[Role.RewardModel] = global_pool_id
 
-    reward_fn = RewardManager(tokenizer=tokenizer, num_examine=0, compute_score=compute_score)
+    reward_manager_name = config.reward_model.get("reward_manager", "naive")
+    if reward_manager_name == 'naive':
+        from verl.workers.reward_manager import NaiveRewardManager
+        reward_manager_cls = NaiveRewardManager
+    elif reward_manager_name == 'prime':
+        from verl.workers.reward_manager import PrimeRewardManager
+        reward_manager_cls = PrimeRewardManager
+    else:
+        raise NotImplementedError
+    reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, compute_score=compute_score)
 
     # Note that we always use function-based RM for validation
-    val_reward_fn = RewardManager(tokenizer=tokenizer, num_examine=1, compute_score=compute_score)
+    val_reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=1, compute_score=compute_score)
 
     resource_pool_manager = ResourcePoolManager(resource_pool_spec=resource_pool_spec, mapping=mapping)
 
