@@ -230,7 +230,7 @@ class DataParallelPPOActor(BasePPOActor):
 
             self.actor_optimizer.zero_grad()
 
-            for data in micro_batches:
+            for data in tqdm(micro_batches, desc="DataParallelPPOActor.update_policy.micro_batch"):
                 data = data.cuda()  # actor device is cpu when using offload
                 responses = data['responses']
                 response_length = responses.size(1)
