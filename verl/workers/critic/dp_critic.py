@@ -152,7 +152,7 @@ class DataParallelPPOCritic(BasePPOCritic):
         # See PPO paper for details. https://arxiv.org/abs/1707.06347
         dataloader = batch.split(self.config.ppo_mini_batch_size)
 
-        for batch_idx, data in enumerate(dataloader):
+        for batch_idx, data in tqdm(enumerate(dataloader), desc="DataParallelPPOCritic.update_critic"):
             # split batch into micro_batches
             mini_batch = data
             if self.config.use_dynamic_bsz:

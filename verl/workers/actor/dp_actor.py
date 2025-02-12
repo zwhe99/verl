@@ -217,7 +217,7 @@ class DataParallelPPOActor(BasePPOActor):
         dataloader = batch.split(self.config.ppo_mini_batch_size)
 
         metrics = {}
-        for batch_idx, data in enumerate(dataloader):
+        for batch_idx, data in tqdm(enumerate(dataloader), desc="DataParallelPPOActor.update_policy"):
             # split batch into micro_batches
             mini_batch = data
             if self.config.use_dynamic_bsz:
