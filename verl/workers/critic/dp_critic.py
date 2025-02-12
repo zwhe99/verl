@@ -20,6 +20,7 @@ from typing import Iterable
 import torch
 import torch.distributed
 from torch import nn, optim
+from tqdm import tqdm
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
@@ -122,7 +123,7 @@ class DataParallelPPOCritic(BasePPOCritic):
             micro_batches = batch.split(micro_batch_size)
 
         values_lst = []
-        for micro_batch in micro_batches:
+        for micro_batch in tqdm(micro_batches, desc="DataParallelPPOCritic.compute_values"):
             with torch.no_grad():
                 values = self._forward_micro_batch(micro_batch)
             values_lst.append(values)

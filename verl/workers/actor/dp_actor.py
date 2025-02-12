@@ -21,6 +21,7 @@ from typing import Iterable, Tuple
 import torch
 from torch import nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from tqdm import tqdm
 
 from verl import DataProto
 from verl.trainer.ppo import core_algos
@@ -186,7 +187,7 @@ class DataParallelPPOActor(BasePPOActor):
             micro_batches = batch.split(micro_batch_size)
 
         log_probs_lst = []
-        for micro_batch in micro_batches:
+        for micro_batch in tqdm(micro_batches, desc="DataParallelPPOActor.compute_log_prob"):
             with torch.no_grad():
                 _, log_probs = self._forward_micro_batch(micro_batch, temperature=temperature)
             log_probs_lst.append(log_probs)
