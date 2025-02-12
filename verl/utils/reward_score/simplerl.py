@@ -91,5 +91,6 @@ def preprocess_box_response_for_qwen_prompt(model_output, answer):
     return "", box_match
 
 def compute_score(solution_str, ground_truth) -> float:
+    solution_str = solution_str.split("<|im_start|>assistant")[-1]
     query, box_match = preprocess_box_response_for_qwen_prompt(solution_str, ground_truth)
     return box_match
