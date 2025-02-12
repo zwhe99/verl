@@ -24,6 +24,7 @@ from enum import Enum
 from pprint import pprint
 from typing import Type, Dict
 from copy import deepcopy
+from tqdm import tqdm
 
 import numpy as np
 from codetiming import Timer
@@ -575,7 +576,7 @@ class RayPPOTrainer(object):
         sample_outputs = []
         sample_scores = []
 
-        for test_data in self.val_dataloader:
+        for test_data in tqdm(self.val_dataloader, desc="Validation"):
             test_batch = DataProto.from_single_dict(test_data)
 
             # we only do validation on rule-based rm
@@ -831,7 +832,7 @@ class RayPPOTrainer(object):
         self.global_steps += 1
 
         for epoch in range(self.config.trainer.total_epochs):
-            for batch_dict in self.train_dataloader:
+            for batch_dict in tqdm(self.train_dataloader, desc=f"Epoch {epoch + 1} / {self.config.trainer.total_epochs}"):
                 metrics = {}
                 timing_raw = {}
 
