@@ -554,7 +554,7 @@ class ActorRolloutRefWorker(Worker):
                                      device_id=torch.cuda.current_device(),
                                      load_grad=self._is_offload_grad)
 
-        self.checkpoint_manager.save_checkpoint(local_path=local_path, hdfs_path=hdfs_path, global_step=global_step, remove_previous_ckpt=self.config.trainer.remove_previous_ckpt)
+        self.checkpoint_manager.save_checkpoint(local_path=local_path, hdfs_path=hdfs_path, global_step=global_step, remove_previous_ckpt=self.config.trainer.remove_previous_ckpt_in_save)
 
         torch.distributed.barrier()
         if self._is_offload_param:
@@ -828,7 +828,7 @@ class CriticWorker(Worker):
                                      device_id=torch.cuda.current_device(),
                                      load_grad=self._is_offload_grad)
 
-        self.checkpoint_manager.save_checkpoint(local_path=local_path, hdfs_path=hdfs_path, global_step=global_step, remove_previous_ckpt=self.config.trainer.remove_previous_ckpt)
+        self.checkpoint_manager.save_checkpoint(local_path=local_path, hdfs_path=hdfs_path, global_step=global_step, remove_previous_ckpt=self.config.trainer.remove_previous_ckpt_in_save)
 
         torch.distributed.barrier()
         if self._is_offload_param:
