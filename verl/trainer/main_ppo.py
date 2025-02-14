@@ -93,7 +93,17 @@ class RewardManager():
 
 @hydra.main(config_path='config', config_name='ppo_trainer', version_base=None)
 def main(config):
-    run_ppo(config)
+    if config.reward_model.reward_func_path is not None:
+        assert config.reward_model.reward_func_path.endswith('.py'), "reward_func_path must be a python file"
+        print(f"Loading custom reward function from {config.reward_model.reward_func_path}")
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("reward_func", config.reward_model.reward_func_path)
+        reward_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(reward_module)
+        compute_score = reward_module.reward_func
+        run_ppo(config, compute_score)
+    else:
+        run_ppo(config)
 
 
 def run_ppo(config, compute_score=None):
