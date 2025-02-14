@@ -170,4 +170,5 @@ trainer:
   test_freq: -1
   critic_warmup: 0
   default_hdfs_dir: null
+  remove_previous_ckpt: True
   default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}

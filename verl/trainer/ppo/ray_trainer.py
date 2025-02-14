@@ -770,10 +770,10 @@ class RayPPOTrainer(object):
         actor_path = os.path.join(global_step_folder, 'actor')
         critic_path = os.path.join(global_step_folder, 'critic')
         # load actor
-        self.actor_rollout_wg.load_checkpoint(actor_path)
+        self.actor_rollout_wg.load_checkpoint(actor_path, del_local_after_load=self.config.trainer.remove_previous_ckpt)
         # load critic
         if self.use_critic:
-            self.critic_wg.load_checkpoint(critic_path)
+            self.critic_wg.load_checkpoint(critic_path, del_local_after_load=self.config.trainer.remove_previous_ckpt)
 
         # load dataloader,
         # TODO: from remote not implemented yet
