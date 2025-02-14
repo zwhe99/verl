@@ -2,7 +2,10 @@ import random
 import regex
 import re
 import sympy
-from latex2sympy2 import latex2sympy
+try:
+    from latex2sympy2 import latex2sympy
+except:
+    pass
 from typing import TypeVar, Iterable, List, Union, Any, Dict
 from word2number import w2n
 from .qwen_utils import *
