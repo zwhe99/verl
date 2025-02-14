@@ -833,10 +833,12 @@ class RayPPOTrainer(object):
         self.global_steps += 1
 
         # recompute `start_epoch`
-        start_epoch = (self.global_steps - 1) // len(self.train_dataloader)
+        num_steps_per_epoch = len(self.train_dataloader)
+        start_epoch = (self.global_steps - 1) // num_steps_per_epoch
 
         for epoch in range(start_epoch, self.config.trainer.total_epochs):
-            for batch_dict in tqdm(self.train_dataloader, desc=f"Epoch {epoch + 1} / {self.config.trainer.total_epochs}"):
+            tqdm_initial = (self.global_steps - 1) % num_steps_per_epoch
+            for batch_dict in tqdm(self.train_dataloader, desc=f"Epoch {epoch + 1} / {self.config.trainer.total_epochs}", initial=tqdm_initial):
                 metrics = {}
                 timing_raw = {}
 
