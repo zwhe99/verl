@@ -998,8 +998,6 @@ class RayPPOTrainer(object):
                 # TODO: make a canonical logger that supports various backend
                 logger.log(data=metrics, step=self.global_steps)
 
-                self.global_steps += 1
-
                 if self.global_steps >= self.total_training_steps:
 
                     # perform validation after training
@@ -1008,3 +1006,5 @@ class RayPPOTrainer(object):
                         pprint(f'Final validation metrics: {val_metrics}')
                         logger.log(data=val_metrics, step=self.global_steps)
                     return
+
+                self.global_steps += 1
