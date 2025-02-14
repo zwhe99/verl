@@ -561,7 +561,7 @@ class ActorRolloutRefWorker(Worker):
             offload_fsdp_param_and_grad(module=self.actor_module_fsdp, offload_grad=self._is_offload_grad)
 
     @register(dispatch_mode=Dispatch.ONE_TO_ALL)
-    def load_checkpoint(self, path, del_local_after_load=True):
+    def load_checkpoint(self, path, del_local_after_load=False):
         if self._is_offload_param:
             load_fsdp_param_and_grad(module=self.actor_module_fsdp,
                                      device_id=torch.cuda.current_device(),
