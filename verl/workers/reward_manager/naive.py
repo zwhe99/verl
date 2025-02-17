@@ -37,7 +37,7 @@ class NaiveRewardManager:
 
         already_print_data_sources = {}
 
-        for i in tqdm(range(len(data)), desc="NaiveRewardManager.__call__"):
+        for i in range(len(data)):
             data_item = data[i]  # DataProtoItem
 
             prompt_ids = data_item.batch['prompts']

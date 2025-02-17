@@ -20,7 +20,6 @@ from typing import Iterable
 import torch
 import torch.distributed
 from torch import nn, optim
-from tqdm import tqdm
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
@@ -123,7 +122,7 @@ class DataParallelPPOCritic(BasePPOCritic):
             micro_batches = batch.split(micro_batch_size)
 
         values_lst = []
-        for micro_batch in tqdm(micro_batches, desc="DataParallelPPOCritic.compute_values"):
+        for micro_batch in micro_batches:
             with torch.no_grad():
                 values = self._forward_micro_batch(micro_batch)
             values_lst.append(values)
@@ -152,7 +151,7 @@ class DataParallelPPOCritic(BasePPOCritic):
         # See PPO paper for details. https://arxiv.org/abs/1707.06347
         dataloader = batch.split(self.config.ppo_mini_batch_size)
 
-        for batch_idx, data in tqdm(enumerate(dataloader), desc="DataParallelPPOCritic.update_critic"):
+        for batch_idx, data in enumerate(dataloader):
             # split batch into micro_batches
             mini_batch = data
             if self.config.use_dynamic_bsz:
@@ -164,7 +163,7 @@ class DataParallelPPOCritic(BasePPOCritic):
 
             self.critic_optimizer.zero_grad()
 
-            for data in tqdm(micro_batches, desc="DataParallelPPOCritic.update_critic.micro_batch"):
+            for data in micro_batches:
                 data = data.cuda()  # critic device is cpu when using offload
                 input_ids = data['input_ids']
                 responses = data['responses']

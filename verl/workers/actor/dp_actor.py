@@ -21,7 +21,6 @@ from typing import Iterable, Tuple
 import torch
 from torch import nn
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from tqdm import tqdm
 
 from verl import DataProto
 from verl.trainer.ppo import core_algos
@@ -187,7 +186,7 @@ class DataParallelPPOActor(BasePPOActor):
             micro_batches = batch.split(micro_batch_size)
 
         log_probs_lst = []
-        for micro_batch in tqdm(micro_batches, desc="DataParallelPPOActor.compute_log_prob"):
+        for micro_batch in micro_batches:
             with torch.no_grad():
                 _, log_probs = self._forward_micro_batch(micro_batch, temperature=temperature)
             log_probs_lst.append(log_probs)
@@ -217,7 +216,7 @@ class DataParallelPPOActor(BasePPOActor):
         dataloader = batch.split(self.config.ppo_mini_batch_size)
 
         metrics = {}
-        for batch_idx, data in tqdm(enumerate(dataloader), desc="DataParallelPPOActor.update_policy"):
+        for batch_idx, data in enumerate(dataloader):
             # split batch into micro_batches
             mini_batch = data
             if self.config.use_dynamic_bsz:
@@ -230,7 +229,7 @@ class DataParallelPPOActor(BasePPOActor):
 
             self.actor_optimizer.zero_grad()
 
-            for data in tqdm(micro_batches, desc="DataParallelPPOActor.update_policy.micro_batch"):
+            for data in micro_batches:
                 data = data.cuda()  # actor device is cpu when using offload
                 responses = data['responses']
                 response_length = responses.size(1)
