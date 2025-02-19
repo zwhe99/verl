@@ -91,11 +91,5 @@ def preprocess_box_response_for_qwen_prompt(model_output, answer):
     return "", box_match
 
 def compute_score(solution_str, ground_truth) -> float:
-    if "<|im_start|>assistant" in solution_str: # for qwen-2.5-math
-        solution_str = solution_str.split("<|im_start|>assistant")[-1]
-    elif "<｜Assistant｜>" in solution_str: # for r1
-        solution_str = solution_str.split("<｜Assistant｜>")[-1]
-    else:
-        raise NotImplementedError(f"Unsupported chat template for reward function.")
     query, box_match = preprocess_box_response_for_qwen_prompt(solution_str, ground_truth)
     return box_match
