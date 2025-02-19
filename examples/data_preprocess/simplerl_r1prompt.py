@@ -23,9 +23,10 @@ if __name__ == '__main__':
     train_dataset = datasets.load_dataset(data_source, split='train')
 
     def process_fn_train(example, idx):
+        messages = [{"content": SYSTEM_PROMPT, "role": "system"}] + example['messages'][1:]
         data = {
             "data_source": "simplerl_r1prompt",
-            "prompt": example['messages'],
+            "prompt": messages,
             "ability": "math",
             "reward_model": {
                 "style": "rule",
@@ -41,9 +42,10 @@ if __name__ == '__main__':
         return data
 
     def process_fn_test(example, idx):
+        messages = [{"content": SYSTEM_PROMPT, "role": "system"}] + example['messages'][1:]
         data = {
             "data_source": "simplerl_r1prompt",
-            "prompt": example['messages'],
+            "prompt": messages,
             "ability": "math",
             "reward_model": {
                 "style": "rule",
