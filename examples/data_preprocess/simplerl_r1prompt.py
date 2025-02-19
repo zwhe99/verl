@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     def process_fn_train(example, idx):
         data = {
-            "data_source": data_source,
+            "data_source": "simplerl_r1prompt",
             "prompt": example['messages'],
             "ability": "math",
             "reward_model": {
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     def process_fn_test(example, idx):
         data = {
-            "data_source": data_source,
+            "data_source": "simplerl_r1prompt",
             "prompt": example['messages'],
             "ability": "math",
             "reward_model": {
