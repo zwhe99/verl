@@ -27,7 +27,7 @@ if __name__ == '__main__':
     data = []
     for idx, od in enumerate(ori_data):
         assert len(od) == 2
-        assert od[0]["from"] == "human" and od[1]["from"] == "assistant"
+        assert od[0]["from"].lower() == "human" and od[1]["from"].lower() == "assistant", f"Error: {od}"
         data.append({
             "data_source": "orz57k",
             "prompt": [
