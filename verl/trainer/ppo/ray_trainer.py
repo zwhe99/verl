@@ -1021,7 +1021,8 @@ class RayPPOTrainer(object):
                                     rollout_data.append({
                                         'prompt': prompt_str,
                                         'response': response_str,
-                                        'reward': reward_float
+                                        'reward': reward_float,
+                                        'expected_answer': data_item.non_tensor_batch['reward_model']['ground_truth']
                                     })
                                 rollout_path = os.path.join(self.config.trainer.default_local_dir, f'global_step_{self.global_steps}', 'rollout.jsonl')
                                 with open(rollout_path, "w", encoding="utf-8") as f:
