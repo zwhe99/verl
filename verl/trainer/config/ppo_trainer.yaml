@@ -157,6 +157,7 @@ algorithm:
 trainer:
   total_epochs: 30
   total_training_steps: null
+  entity_name: null
   project_name: verl_examples
   experiment_name: gsm8k
   logger: [ 'console', 'wandb' ]

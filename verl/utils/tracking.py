@@ -24,7 +24,7 @@ from typing import List, Union, Dict, Any
 class Tracking(object):
     supported_backend = ["wandb", "mlflow", "swanlab", "console"]
 
-    def __init__(self, project_name, experiment_name, default_backend: Union[str, List[str]] = 'console', config=None):
+    def __init__(self, entity_name, project_name, experiment_name, default_backend: Union[str, List[str]] = 'console', config=None):
         if isinstance(default_backend, str):
             default_backend = [default_backend]
         for backend in default_backend:
@@ -38,7 +38,7 @@ class Tracking(object):
 
         if 'tracking' in default_backend or 'wandb' in default_backend:
             import wandb
-            wandb.init(project=project_name, name=experiment_name, config=config)
+            wandb.init(entity=entity_name, project=project_name, name=experiment_name, config=config)
             self.logger['wandb'] = wandb
 
         if 'mlflow' in default_backend:

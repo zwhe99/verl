@@ -446,7 +446,8 @@ class FSDPSFTTrainer(object):
 
         # TODO: add a unified tracking
         if rank == 0:
-            tracking = Tracking(project_name=self.config.trainer.project_name,
+            tracking = Tracking(entity_name=self.config.trainer.entity_name,
+                                project_name=self.config.trainer.project_name,
                                 experiment_name=self.config.trainer.experiment_name,
                                 default_backend=self.config.trainer.logger)
 
