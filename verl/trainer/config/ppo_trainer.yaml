@@ -174,4 +174,7 @@ trainer:
   default_hdfs_dir: null
   remove_previous_ckpt_in_save: False
   del_local_ckpt_after_load: False
+  trajectory_injection: True
+  trajectory_injection_threshold: -0.5
+  trajectory_injection_reward: 1
   default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}

@@ -40,6 +40,7 @@ from verl.trainer.ppo import core_algos
 from verl.utils.seqlen_balancing import get_seqlen_balanced_partitions, log_seqlen_unbalance
 from verl.utils.checkpoint.checkpoint_manager import find_latest_ckpt_path
 from verl.utils.dataset.rl_dataset import RLHFDataset, collate_fn
+from verl.utils.torch_functional import get_eos_mask
 
 WorkerType = Type[Worker]
 
@@ -380,6 +381,8 @@ class RayPPOTrainer(object):
         else:
             raise NotImplementedError
 
+        assert not (self.config.algorithm.adv_estimator != 'grpo' and self.config.trainer.trajectory_injection), "trajectory_injection is only supported for GRPO"
+
         self._validate_config()
         self._create_dataloader()
 
@@ -468,10 +471,13 @@ class RayPPOTrainer(object):
         self.train_dataset = RLHFDataset(parquet_files=self.config.data.train_files,
                                          tokenizer=self.tokenizer,
                                          prompt_key=self.config.data.prompt_key,
+                                         response_key=self.config.data.response_key,
                                          max_prompt_length=self.config.data.max_prompt_length,
+                                         max_response_length=self.config.data.max_response_length,
                                          filter_prompts=True,
                                          return_raw_chat=self.config.data.get('return_raw_chat', False),
-                                         truncation='error')
+                                         truncation='error',
+                                         trajectory_injection=self.config.trainer.trajectory_injection)
         # use sampler for better ckpt resume
         if self.config.data.shuffle:
             train_dataloader_generator = torch.Generator()
@@ -489,7 +495,9 @@ class RayPPOTrainer(object):
         self.val_dataset = RLHFDataset(parquet_files=self.config.data.val_files,
                                        tokenizer=self.tokenizer,
                                        prompt_key=self.config.data.prompt_key,
+                                       response_key=self.config.data.response_key,
                                        max_prompt_length=self.config.data.max_prompt_length,
+                                       max_response_length=self.config.data.max_response_length,
                                        filter_prompts=True,
                                        return_raw_chat=self.config.data.get('return_raw_chat', False),
                                        truncation='error')
@@ -893,6 +901,47 @@ class RayPPOTrainer(object):
                     # Please take care when you implement group based adv computation such as GRPO and rloo
                     self._balance_batch(batch, metrics=metrics)
 
+                    with _timer('reward', timing_raw):
+                        print("reward_fn start")
+                        start_time = time.time()
+                        reward_tensor = self.reward_fn(batch)
+                        if self.config.trainer.trajectory_injection:
+                            reward_tensor_aggr = reward_tensor.sum(dim=-1)
+                            grouped_reward_tensor = reward_tensor_aggr.view(-1, self.config.actor_rollout_ref.rollout.n)
+                            grouped_reward_tensor_mean = grouped_reward_tensor.mean(dim=-1)
+                            grouped_reward_tensor_argmin = grouped_reward_tensor.argmin(dim=-1)
+                            inject_group_id = (grouped_reward_tensor_mean <= self.config.trainer.trajectory_injection_threshold).nonzero()[:, 0]
+                            inject_item_id = torch.tensor([
+                                igi * self.config.actor_rollout_ref.rollout.n + grouped_reward_tensor_argmin[igi]
+                                for igi in inject_group_id
+                            ])
+
+                            # inject the ground truth response into the batch
+                            batch.batch['responses'][inject_item_id] = batch.batch['gt_response'][inject_item_id]
+
+                            # modify the `input_ids`
+                            batch.batch['input_ids'] = torch.cat([batch.batch['prompts'], batch.batch['responses']], dim=-1)
+
+                            # modify the `attention_mask`
+                            prompt_attention_mask = batch.batch['attention_mask'][:, :batch.batch['prompts'].shape[-1]]
+                            response_attention_mask = get_eos_mask(response_id=batch.batch['responses'], eos_token=self.tokenizer.eos_token_id, dtype=batch.batch['attention_mask'].dtype)
+                            batch.batch['attention_mask'] = torch.cat([prompt_attention_mask, response_attention_mask], dim=-1)
+
+                            # modify the `position_ids`
+                            prompt_position_ids = batch.batch['position_ids'][:, :batch.batch['prompts'].shape[-1]]
+                            delta_position_id = torch.arange(1,  batch.batch['responses'].shape[-1] + 1, device=prompt_position_ids.device)
+                            delta_position_id = delta_position_id.unsqueeze(0).repeat(batch.batch['responses'].shape[0], 1)
+                            response_position_ids = prompt_position_ids[:, -1:] + delta_position_id
+                            batch.batch['position_ids'] = torch.cat([prompt_position_ids, response_position_ids], dim=-1)
+
+                            # modify the `reward_tensor`
+                            nonzero_indices = (reward_tensor != 0).nonzero()
+                            reward_tensor_aggr[inject_item_id] = self.config.trainer.trajectory_injection_reward
+                            reward_tensor[nonzero_indices[:, 0], nonzero_indices[:, 1]] = reward_tensor_aggr
+
+                        batch.batch['token_level_scores'] = reward_tensor
+                        print(f"reward_fn end, time: {time.time() - start_time} seconds")
+
                     # compute global_valid tokens
                     batch.meta_info['global_token_num'] = torch.sum(batch.batch['attention_mask'], dim=-1).tolist()
 
@@ -933,14 +982,6 @@ class RayPPOTrainer(object):
                             # we first compute reward model score
                             reward_tensor = self.rm_wg.compute_rm_score(batch)
                             batch = batch.union(reward_tensor)
-
-                        # we combine with rule-based rm
-                        print("reward_fn start")
-                        start_time = time.time()
-                        reward_tensor = self.reward_fn(batch)
-                        end_time = time.time()
-                        print(f"reward_fn end, time: {end_time - start_time} seconds")
-                        batch.batch['token_level_scores'] = reward_tensor
 
                         # compute rewards. apply_kl_penalty if available
                         if not self.config.actor_rollout_ref.actor.get('use_kl_loss', False):
