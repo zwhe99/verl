@@ -939,6 +939,8 @@ class RayPPOTrainer(object):
                             reward_tensor_aggr[inject_item_id] = self.config.trainer.trajectory_injection_reward
                             reward_tensor[nonzero_indices[:, 0], nonzero_indices[:, 1]] = reward_tensor_aggr
 
+                            print(f"# Trajectory injection: {inject_item_id.shape[0]}")
+
                         batch.batch['token_level_scores'] = reward_tensor
                         print(f"reward_fn end, time: {time.time() - start_time} seconds")
 
