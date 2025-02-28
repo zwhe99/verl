@@ -166,7 +166,7 @@ class RLHFDataset(Dataset):
                                                                                   max_length=self.max_response_length,
                                                                                   pad_token_id=self.tokenizer.pad_token_id,
                                                                                   left_pad=False,
-                                                                                  truncation=self.truncation)
+                                                                                  truncation="right")
             gt_position_ids = compute_position_id_with_mask(gt_attention_mask)
             row_dict['gt_response'] = gt_input_ids[0]
             row_dict['gt_attention_mask'] = gt_attention_mask[0]
