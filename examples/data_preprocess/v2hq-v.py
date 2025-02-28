@@ -2,6 +2,7 @@ import os
 import datasets
 import json
 import argparse
+import datasets
 from datasets import Dataset
 
 def read_jsonl(file):
@@ -36,6 +37,17 @@ if __name__ == '__main__':
     # process the dataset
     data = []
     for idx, od in enumerate(ori_data):
+        r1_response = od["model_solutions"]["deepseek-ai/DeepSeek-R1"][0].strip()
+        if r1_response.startswith("<think>"):
+            r1_response = r1_response[len("<think>"):]
+
+        if "</think>" in r1_response and r1_response.count("</think>") == 1:
+            r1_response_reasoning_content = r1_response.split("</think>")[0].strip()
+            r1_response_content = r1_response.split("</think>")[1].strip()
+        else:
+            r1_response_reasoning_content = r1_response
+            r1_response_content = ""
+
         data.append({
             "data_source": "v2hq-v",
             "prompt": [
@@ -58,12 +70,26 @@ if __name__ == '__main__':
                 'index': idx,
                 'answer': od["expected_answer"],
                 "question": od["problem"],
-            }
+            },
+            "r1": f"<think>{r1_response_reasoning_content}</think>{r1_response_content}",
+            "r1_with_ans_label": f"<think>{r1_response_reasoning_content}</think><answer>{r1_response_content}</answer>",
+            "r1_thinking": r1_response_reasoning_content,
         })
 
     # add simplerl data
     simplerl_dataset = datasets.load_dataset('zwhe99/simplerl', split='train')
     for idx, sd in enumerate(simplerl_dataset):
+        r1_response = sd["r1_response"].strip()
+        if r1_response.startswith("<think>"):
+            r1_response = r1_response[len("<think>"):]
+
+        if "</think>" in r1_response and r1_response.count("</think>") == 1:
+            r1_response_reasoning_content = r1_response.split("</think>")[0].strip()
+            r1_response_content = r1_response.split("</think>")[1].strip()
+        else:
+            r1_response_reasoning_content = r1_response
+            r1_response_content = ""
+
         data.append({
             "data_source": "v2hq-v",
             "prompt": sd['messages'],
@@ -77,7 +103,10 @@ if __name__ == '__main__':
                 'index': idx,
                 'answer': sd['answer'],
                 "question": sd['problem'],
-            }
+            },
+            "r1": f"<think>{r1_response_reasoning_content}</think>{r1_response_content}",
+            "r1_with_ans_label": f"<think>{r1_response_reasoning_content}</think><answer>{r1_response_content}</answer>",
+            "r1_thinking": r1_response_reasoning_content,
         })
 
     train_dataset = Dataset.from_list(data)
