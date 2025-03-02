@@ -15,7 +15,11 @@
 from verl import DataProto
 from verl.utils.reward_score import _default_compute_score
 import torch
+import ray
 from tqdm import tqdm
+
+def is_ray_remote_function(func):
+    return hasattr(func, 'remote') and callable(func.remote)
 
 class NaiveRewardManager:
     """The reward manager.
@@ -27,12 +31,74 @@ class NaiveRewardManager:
         self.compute_score = compute_score or _default_compute_score
 
     def __call__(self, data: DataProto):
-        """We will expand this function gradually based on the available datasets"""
-
         # If there is rm score, we directly return rm score. Otherwise, we compute via rm_score_fn
         if 'rm_scores' in data.batch.keys():
             return data.batch['rm_scores']
 
+        if is_ray_remote_function(self.compute_score):
+            return self._call_reward_ray(data)
+        else:
+            return self._call_reward(data)
+
+    def _call_reward_ray(self, data: DataProto):
+        reward_tensor = torch.zeros_like(data.batch['responses'], dtype=torch.float32)
+        prompt_length = data.batch['prompts'].shape[-1]
+
+        # get data source list
+        data_source_lst = [data[i].non_tensor_batch['data_source'] for i in range(len(data))]
+
+        # get solution str list
+        response_ids = data.batch['responses']
+        valid_response_length = data.batch['attention_mask'][:, prompt_length:].sum(dim=-1)
+        valid_response_ids = [
+            response_ids[i][:valid_response_length[i]]
+            for i in range(len(data))
+        ]
+        solution_str_lst = [
+            self.tokenizer.decode(valid_response_ids[i])
+            for i in range(len(data))
+        ]
+
+        # get ground truth list
+        ground_truth_lst = [
+            data[i].non_tensor_batch['reward_model']['ground_truth']
+            for i in range(len(data))
+        ]
+
+        # get extra info list
+        extra_info_lst = [
+            data[i].non_tensor_batch.get('extra_info', None)
+            for i in range(len(data))
+        ]
+
+        # compute reward
+        reward_future_lst = [self.compute_score.remote(
+            data_source=data_source_lst[i],
+            solution_str=solution_str_lst[i],
+            ground_truth=ground_truth_lst[i],
+            extra_info=extra_info_lst[i],
+        ) for i in range(len(data))]
+        score_lst = ray.get(reward_future_lst)
+
+        # fill reward tensor
+        for i in range(len(data)):
+            reward_tensor[i, valid_response_length[i] - 1] = score_lst[i]
+
+        # print to console
+        already_print_data_sources = {}
+        for i in range(len(data)):
+            data_item = data[i]
+            data_source = data_item.non_tensor_batch['data_source']
+            if data_source not in already_print_data_sources:
+                already_print_data_sources[data_source] = 0
+
+            if already_print_data_sources[data_source] < self.num_examine:
+                already_print_data_sources[data_source] += 1
+                print(solution_str_lst[i])
+
+        return reward_tensor
+
+    def _call_reward(self, data: DataProto):
         reward_tensor = torch.zeros_like(data.batch['responses'], dtype=torch.float32)
 
         already_print_data_sources = {}
