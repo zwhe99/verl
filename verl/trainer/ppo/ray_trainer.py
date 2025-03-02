@@ -1089,7 +1089,7 @@ class RayPPOTrainer(object):
                 if self.global_steps >= self.total_training_steps:
 
                     # perform validation after training
-                    if self.val_reward_fn is not None:
+                    if self.val_reward_fn is not None and self.config.trainer.test_freq > 0:
                         val_metrics = self._validate()
                         pprint(f'Final validation metrics: {val_metrics}')
                         logger.log(data=val_metrics, step=self.global_steps)
