@@ -915,29 +915,35 @@ class RayPPOTrainer(object):
                                 igi * self.config.actor_rollout_ref.rollout.n + grouped_reward_tensor_argmin[igi]
                                 for igi in inject_group_id
                             ])
+                            num_trajectory_injection = inject_item_id.shape[0]
 
-                            # inject the ground truth response into the batch
-                            batch.batch['responses'][inject_item_id] = batch.batch['gt_response'][inject_item_id]
+                            if num_trajectory_injection > 0:
+                                max_prompt_length = batch.batch['prompts'].shape[-1]
+                                max_response_length = batch.batch['responses'].shape[-1]
+                                num_of_responses = batch.batch['responses'].shape[0]
 
-                            # modify the `input_ids`
-                            batch.batch['input_ids'] = torch.cat([batch.batch['prompts'], batch.batch['responses']], dim=-1)
+                                # inject the ground truth response into the batch
+                                batch.batch['responses'][inject_item_id] = batch.batch['gt_response'][inject_item_id]
 
-                            # modify the `attention_mask`
-                            prompt_attention_mask = batch.batch['attention_mask'][:, :batch.batch['prompts'].shape[-1]]
-                            response_attention_mask = get_eos_mask(response_id=batch.batch['responses'], eos_token=self.tokenizer.eos_token_id, dtype=batch.batch['attention_mask'].dtype)
-                            batch.batch['attention_mask'] = torch.cat([prompt_attention_mask, response_attention_mask], dim=-1)
+                                # modify the `input_ids`
+                                batch.batch['input_ids'] = torch.cat([batch.batch['prompts'], batch.batch['responses']], dim=-1)
 
-                            # modify the `position_ids`
-                            prompt_position_ids = batch.batch['position_ids'][:, :batch.batch['prompts'].shape[-1]]
-                            delta_position_id = torch.arange(1,  batch.batch['responses'].shape[-1] + 1, device=prompt_position_ids.device)
-                            delta_position_id = delta_position_id.unsqueeze(0).repeat(batch.batch['responses'].shape[0], 1)
-                            response_position_ids = prompt_position_ids[:, -1:] + delta_position_id
-                            batch.batch['position_ids'] = torch.cat([prompt_position_ids, response_position_ids], dim=-1)
+                                # modify the `attention_mask`
+                                prompt_attention_mask = batch.batch['attention_mask'][:, :max_prompt_length]
+                                response_attention_mask = get_eos_mask(response_id=batch.batch['responses'], eos_token=self.tokenizer.eos_token_id, dtype=batch.batch['attention_mask'].dtype)
+                                batch.batch['attention_mask'] = torch.cat([prompt_attention_mask, response_attention_mask], dim=-1)
 
-                            # modify the `reward_tensor`
-                            nonzero_indices = (reward_tensor != 0).nonzero()
-                            reward_tensor_aggr[inject_item_id] = self.config.trainer.trajectory_injection_reward
-                            reward_tensor[nonzero_indices[:, 0], nonzero_indices[:, 1]] = reward_tensor_aggr
+                                # modify the `position_ids`
+                                prompt_position_ids = batch.batch['position_ids'][:, :max_prompt_length]
+                                delta_position_id = torch.arange(1, max_response_length + 1, device=prompt_position_ids.device).unsqueeze(0).repeat(num_of_responses, 1)
+                                response_position_ids = prompt_position_ids[:, -1:] + delta_position_id
+                                batch.batch['position_ids'] = torch.cat([prompt_position_ids, response_position_ids], dim=-1)
+
+                                # modify the `reward_tensor`
+                                rows = torch.arange(num_of_responses)
+                                cols = batch.batch['attention_mask'][:, max_prompt_length:].sum(dim=-1) - 1
+                                reward_tensor_aggr[inject_item_id] = self.config.trainer.trajectory_injection_reward
+                                reward_tensor[rows, cols] = reward_tensor_aggr
 
                             print(f"# Trajectory injection: {inject_item_id.shape[0]}")
 
@@ -1050,11 +1056,11 @@ class RayPPOTrainer(object):
                                 for i in range(len(batch)):
                                     data_item = batch[i]  # DataProtoItem
                                     prompt_ids = data_item.batch['prompts']
-                                    prompt_length = prompt_ids.shape[-1]
-                                    valid_prompt_length = data_item.batch['attention_mask'][:prompt_length].sum()
+                                    max_prompt_length = prompt_ids.shape[-1]
+                                    valid_prompt_length = data_item.batch['attention_mask'][:max_prompt_length].sum()
                                     valid_prompt_ids = prompt_ids[-valid_prompt_length:]
                                     response_ids = data_item.batch['responses']
-                                    valid_response_length = data_item.batch['attention_mask'][prompt_length:].sum()
+                                    valid_response_length = data_item.batch['attention_mask'][max_prompt_length:].sum()
                                     valid_response_ids = response_ids[:valid_response_length]
 
                                     # decode
