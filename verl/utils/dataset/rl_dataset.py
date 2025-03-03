@@ -160,7 +160,7 @@ class RLHFDataset(Dataset):
         if self.trajectory_injection:
             assert self.response_key in row_dict, f"response_key ({self.response_key}) not found in dataset"
             gt_response = row_dict.pop(self.response_key)
-            gt_input_ids, gt_attention_mask = verl_F.tokenize_and_postprocess_data(prompt=gt_response,
+            gt_input_ids, gt_attention_mask = verl_F.tokenize_and_postprocess_data(prompt=gt_response + self.tokenizer.eos_token,
                                                                                   tokenizer=self.tokenizer,
                                                                                   max_length=self.max_response_length,
                                                                                   pad_token_id=self.tokenizer.pad_token_id,
