@@ -71,9 +71,10 @@ if __name__ == '__main__':
                 'answer': od["expected_answer"],
                 "question": od["problem"],
             },
-            "r1": f"<think>{r1_response_reasoning_content}</think>{r1_response_content}",
-            "r1_with_ans_label": f"<think>{r1_response_reasoning_content}</think><answer>{r1_response_content}</answer>",
-            "r1_thinking": r1_response_reasoning_content,
+            "r1_content": r1_response_content,
+            "r1_reasoning_content": r1_response_reasoning_content,
+            "r1": f"{r1_response_reasoning_content} </think> {r1_response_content}",
+            "r1_with_ans_label": f"{r1_response_reasoning_content} </think> <answer> {r1_response_content} </answer>",
         })
 
     # add simplerl data
@@ -104,9 +105,10 @@ if __name__ == '__main__':
                 'answer': sd['answer'],
                 "question": sd['problem'],
             },
-            "r1": f"<think>{r1_response_reasoning_content}</think>{r1_response_content}",
-            "r1_with_ans_label": f"<think>{r1_response_reasoning_content}</think><answer>{r1_response_content}</answer>",
-            "r1_thinking": r1_response_reasoning_content,
+            "r1_content": r1_response_content,
+            "r1_reasoning_content": r1_response_reasoning_content,
+            "r1": f"{r1_response_reasoning_content} </think> {r1_response_content}",
+            "r1_with_ans_label": f"{r1_response_reasoning_content} </think> <answer> {r1_response_content} </answer>",
         })
 
     train_dataset = Dataset.from_list(data)
