@@ -41,7 +41,7 @@ class Tracking(object):
             if run_id is None:
                 wandb.init(entity=entity_name, project=project_name, name=experiment_name, config=config)
             else:
-                wandb.init(entity=entity_name, project=project_name, name=experiment_name, config=config, id=run_id, resume="must")
+                wandb.init(entity=entity_name, project=project_name, name=experiment_name, config=config, id=run_id, resume="allow")
             self.logger['wandb'] = wandb
 
         if 'mlflow' in default_backend:
