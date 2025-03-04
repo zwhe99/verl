@@ -931,11 +931,6 @@ class RayPPOTrainer(object):
                     batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                     batch = batch.union(gen_batch_output)
 
-                    # balance the number of valid tokens on each dp rank.
-                    # Note that this breaks the order of data inside the batch.
-                    # Please take care when you implement group based adv computation such as GRPO and rloo
-                    self._balance_batch(batch, metrics=metrics)
-
                     with _timer('reward', timing_raw):
                         print("reward_fn start")
                         start_time = time.time()
@@ -985,6 +980,11 @@ class RayPPOTrainer(object):
 
                         batch.batch['token_level_scores'] = reward_tensor
                         print(f"reward_fn end, time: {time.time() - start_time} seconds")
+
+                    # balance the number of valid tokens on each dp rank.
+                    # Note that this breaks the order of data inside the batch.
+                    # Please take care when you implement group based adv computation such as GRPO and rloo
+                    self._balance_batch(batch, metrics=metrics)
 
                     # compute global_valid tokens
                     batch.meta_info['global_token_num'] = torch.sum(batch.batch['attention_mask'], dim=-1).tolist()
@@ -1090,6 +1090,7 @@ class RayPPOTrainer(object):
                             with _timer('save_rollout', timing_raw):
                                 rollout_data = []
                                 for i in range(len(batch)):
+                                    data_uid = batch.non_tensor_batch['uid'][i]
                                     data_item = batch[i]  # DataProtoItem
                                     prompt_ids = data_item.batch['prompts']
                                     max_prompt_length = prompt_ids.shape[-1]
@@ -1105,11 +1106,14 @@ class RayPPOTrainer(object):
                                     reward_float = reward_tensor[i, valid_response_length - 1].item()
 
                                     rollout_data.append({
+                                        "uid": data_uid,
                                         'prompt': prompt_str,
                                         'response': response_str,
                                         'reward': reward_float,
                                         'expected_answer': data_item.non_tensor_batch['reward_model']['ground_truth']
                                     })
+                                # sort by uid
+                                rollout_data.sort(key=lambda x: x['uid'])
                                 rollout_path = os.path.join(self.config.trainer.default_local_dir, f'global_step_{self.global_steps}', 'rollout.jsonl')
                                 with open(rollout_path, "w", encoding="utf-8") as f:
                                     for rd in rollout_data:
