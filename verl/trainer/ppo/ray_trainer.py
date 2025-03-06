@@ -973,6 +973,7 @@ class RayPPOTrainer(object):
                                 rows = torch.arange(num_of_responses)
                                 cols = batch.batch['attention_mask'][:, max_prompt_length:].sum(dim=-1) - 1
                                 reward_tensor_aggr[inject_item_id] = self.config.trainer.trajectory_injection_reward
+                                reward_tensor = torch.zeros_like(reward_tensor) # must reset reward_tensor to zero!!
                                 reward_tensor[rows, cols] = reward_tensor_aggr
 
                             metrics['critic/trajectory_injection_num'] = num_trajectory_injection
