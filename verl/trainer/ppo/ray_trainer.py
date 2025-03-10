@@ -1157,11 +1157,12 @@ class RayPPOTrainer(object):
                                     response_ids = data_item.batch['responses']
                                     valid_response_length = data_item.batch['attention_mask'][max_prompt_length:].sum()
                                     valid_response_ids = response_ids[:valid_response_length]
+                                    token_level_scores = data_item.batch['token_level_scores']
 
                                     # decode
                                     prompt_str = self.tokenizer.decode(valid_prompt_ids)
                                     response_str = self.tokenizer.decode(valid_response_ids)
-                                    reward_float = reward_tensor[i, valid_response_length - 1].item()
+                                    reward_float = token_level_scores[valid_response_length - 1].item()
 
                                     rollout_data.append({
                                         "uid": data_uid,
