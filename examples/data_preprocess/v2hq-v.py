@@ -111,8 +111,38 @@ if __name__ == '__main__':
             "r1_with_ans_label": f"{r1_response_reasoning_content} </think> <answer> {r1_response_content} </answer>",
         })
 
+    # test data
+    test_dataset = datasets.load_dataset('zwhe99/MATH', split='math500')
+    def process_fn_test(example, idx):
+        data = {
+            "data_source": "math500",
+            "prompt": [
+                {
+                    "content": "Please reason step by step, and put your final answer within \\boxed{}.",
+                    "role": "system",
+                },
+                {
+                    "content": example["problem"],
+                    "role": "user",
+                },
+            ],
+            "ability": "math",
+            "reward_model": {
+                "style": "rule",
+                "ground_truth": example["expected_answer"],
+            },
+            "extra_info": {
+                "split": "math500",
+                "index": idx,
+                "answer": example["expected_answer"],
+                "question": example["problem"],
+            },
+        }
+        return data
+
+
     train_dataset = Dataset.from_list(data)
-    test_dataset = Dataset.from_list(data)
+    test_dataset = test_dataset.map(function=process_fn_test, with_indices=True)
     train_dataset.to_parquet(os.path.join(args.local_dir, 'train.parquet'))
     test_dataset.to_parquet(os.path.join(args.local_dir, 'test.parquet'))
     print(f"Train: {len(train_dataset)}, Test: {len(test_dataset)}")
