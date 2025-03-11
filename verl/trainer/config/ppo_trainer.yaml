@@ -181,4 +181,7 @@ trainer:
   trajectory_injection: False
   trajectory_injection_threshold: -0.5
   trajectory_injection_reward: 1
+  passk_reward: False
+  passk_reward_alpha: 0.2
+  passk_reward_beta: 2
   default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}

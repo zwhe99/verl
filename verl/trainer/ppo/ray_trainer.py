@@ -935,6 +935,63 @@ class RayPPOTrainer(object):
                         print("reward_fn start")
                         start_time = time.time()
                         reward_tensor = self.reward_fn(batch)
+
+                        if self.config.trainer.passk_reward:
+                            # calculate the reward for each response
+                            reward_tensor_aggr = reward_tensor.sum(dim=-1)
+                            grouped_reward_tensor = reward_tensor_aggr.view(
+                                -1, self.config.actor_rollout_ref.rollout.n
+                            )
+                            grouped_reward_tensor_mean = grouped_reward_tensor.mean(
+                                dim=-1
+                            )
+                            metrics["critic/rewards/outcome_reward_mean"] = (
+                                grouped_reward_tensor_mean.mean().item()
+                            )
+
+                            # get the length of each response
+                            max_prompt_length = batch.batch["prompts"].shape[-1]
+                            responses_length_id = (
+                                batch.batch["attention_mask"][
+                                    :, max_prompt_length:
+                                ].sum(dim=-1)
+                                - 1
+                            )
+
+                            # standardize the responses length matrix
+                            responses_length = responses_length_id.view(
+                                -1, self.config.actor_rollout_ref.rollout.n
+                            )
+                            mean = responses_length.float().mean(dim=1).view(-1, 1)
+                            std = responses_length.float().std(dim=1).view(-1, 1)
+                            responses_length_normalized = (responses_length - mean) / (
+                                std + 1e-7
+                            )
+
+                            sigmoid_gamma = self.config.trainer.passk_reward_beta * (
+                                grouped_reward_tensor_mean - 0.5
+                            ).view(-1, 1)
+                            passk_reward_tensor = 1 - torch.sigmoid(
+                                sigmoid_gamma * responses_length_normalized
+                            ).view(-1)
+
+                            reward_tensor[
+                                torch.arange(reward_tensor.size(0)),
+                                responses_length_id,
+                            ] += (
+                                passk_reward_tensor
+                                * self.config.trainer.passk_reward_alpha
+                            )
+
+                            metrics["critic/rewards/length_reward_mean"] = (
+                                (
+                                    passk_reward_tensor
+                                    * self.config.trainer.passk_reward_alpha
+                                )
+                                .mean()
+                                .item()
+                            )
+
                         if self.config.trainer.trajectory_injection:
                             reward_tensor_aggr = reward_tensor.sum(dim=-1)
                             grouped_reward_tensor = reward_tensor_aggr.view(-1, self.config.actor_rollout_ref.rollout.n)
