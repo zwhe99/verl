@@ -525,6 +525,7 @@ class RayPPOTrainer(object):
                                        tokenizer=self.tokenizer,
                                        prompt_key=self.config.data.prompt_key,
                                        response_key=self.config.data.response_key,
+                                       rm_system_prompt=self.config.data.rm_system_prompt,
                                        max_prompt_length=self.config.data.max_prompt_length,
                                        max_response_length=self.config.data.max_response_length,
                                        filter_prompts=True,
