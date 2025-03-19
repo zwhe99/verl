@@ -961,12 +961,13 @@ class RayPPOTrainer(object):
                         start_time = time.time()
                         reward_tensor = self.reward_fn(batch)
 
+                        # compute the outcome_reward before adding length_reward
+                        reward_tensor_aggr = reward_tensor.sum(dim=-1)
+                        grouped_reward_tensor = reward_tensor_aggr.view(-1, self.config.actor_rollout_ref.rollout.n)
+                        grouped_reward_tensor_mean = grouped_reward_tensor.mean(dim=-1)
+                        metrics["critic/rewards/outcome_reward_mean"] = grouped_reward_tensor_mean.mean().item()
                         if self.config.trainer.passk_reward:
                             # get the prompt-specific sigmoid_gamma using passk
-                            reward_tensor_aggr = reward_tensor.sum(dim=-1)
-                            grouped_reward_tensor = reward_tensor_aggr.view(-1, self.config.actor_rollout_ref.rollout.n)
-                            grouped_reward_tensor_mean = grouped_reward_tensor.mean(dim=-1)
-                            metrics["critic/rewards/outcome_reward_mean"] = grouped_reward_tensor_mean.mean().item()
                             sigmoid_gamma = self.config.trainer.passk_reward_beta * (grouped_reward_tensor_mean - 0.5).view(-1, 1)
 
                             # get the grouped_response_length of each prompt
