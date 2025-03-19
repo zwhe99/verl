@@ -82,6 +82,7 @@ class RLHFDataset(Dataset):
                  tokenizer: PreTrainedTokenizer,
                  processor: Optional[ProcessorMixin] = None,
                  prompt_key='prompt',
+                 rm_system_prompt=False,
                  image_key='images',
                  max_prompt_length=1024,
                  filter_prompts=True,
@@ -100,6 +101,7 @@ class RLHFDataset(Dataset):
         self.processor = processor
 
         self.prompt_key = prompt_key
+        self.rm_system_prompt = rm_system_prompt
         self.image_key = image_key
         self.max_prompt_length = max_prompt_length
         self.filter_prompts = filter_prompts
@@ -128,6 +130,11 @@ class RLHFDataset(Dataset):
             dataframe = pd.read_parquet(parquet_file)
             dataframes.append(dataframe)
         self.dataframe = pd.concat(dataframes)
+
+        # remove system prompt if rm_system_prompt is True
+        if self.rm_system_prompt:
+            self.dataframe[self.prompt_key] = self.dataframe[self.prompt_key].apply(lambda x: x[1:] if x[0]["role"] == "system" else x)
+            print('remove system prompt from dataset')
 
         print(f'dataset len: {len(self.dataframe)}')
 

@@ -4,6 +4,7 @@ data:
   val_files: ~/data/rlhf/gsm8k/test.parquet
   prompt_key: prompt
   reward_fn_key: data_source
+  rm_system_prompt: False
   max_prompt_length: 512
   max_response_length: 512
   gen_batch_size: ${data.train_batch_size}
