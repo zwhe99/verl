@@ -523,6 +523,7 @@ class RayPPOTrainer(object):
         sample_inputs = []
         sample_outputs = []
         sample_scores = []
+        sample_expected_answers = []
 
         for test_data in self.val_dataloader:
             test_batch = DataProto.from_single_dict(test_data)
@@ -582,7 +583,29 @@ class RayPPOTrainer(object):
             scores = reward_tensor.sum(-1).cpu().tolist()
             sample_scores.extend(scores)
 
+            # Store expected answers
+            expected_answers = [test_batch[i].non_tensor_batch['reward_model']['ground_truth'] for i in range(len(test_batch))]
+            sample_expected_answers.extend(expected_answers)
+
             data_source_lst.append(test_batch.non_tensor_batch.get('data_source', ['unknown'] * reward_tensor.shape[0]))
+
+        # save
+        val_path = os.path.join(self.config.trainer.default_local_dir, f'global_step_{self.global_steps}', 'val.jsonl')
+        if not os.path.exists(val_path):
+            os.makedirs(os.path.dirname(val_path), exist_ok=True)
+        with open(val_path, 'w') as f:
+            for si, so, ss, sea in zip(sample_inputs, sample_outputs, sample_scores, sample_expected_answers):
+                f.write(
+                    json.dumps(
+                        {
+                            "prompt": si,
+                            "response": so,
+                            "reward": ss,
+                            "expected_answer": sea
+                        },
+                        ensure_ascii=False
+                    ) + '\n'
+                )
 
         self._maybe_log_val_generations(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores)
 
