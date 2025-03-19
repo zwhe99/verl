@@ -833,8 +833,10 @@ class RayPPOTrainer(object):
         from verl.utils.tracking import Tracking
         from omegaconf import OmegaConf
 
-        logger = Tracking(project_name=self.config.trainer.project_name,
+        logger = Tracking(entity_name=self.config.trainer.entity_name,
+                          project_name=self.config.trainer.project_name,
                           experiment_name=self.config.trainer.experiment_name,
+                          run_id=self.config.trainer.run_id,
                           default_backend=self.config.trainer.logger,
                           config=OmegaConf.to_container(self.config, resolve=True))
 
