@@ -106,7 +106,6 @@ def main_task(config):
     role_worker_mapping = {
         Role.ActorRollout: ray.remote(ActorRolloutRefWorker),
         Role.Critic: ray.remote(CriticWorker),
-        Role.RefPolicy: ray.remote(ActorRolloutRefWorker)
     }
 
     global_pool_id = 'global_pool'
@@ -116,8 +115,15 @@ def main_task(config):
     mapping = {
         Role.ActorRollout: global_pool_id,
         Role.Critic: global_pool_id,
-        Role.RefPolicy: global_pool_id,
     }
+
+    # a strict condition to disable kl loss
+    disable_kl = (not config.actor_rollout_ref.actor.use_kl_loss) and (config.actor_rollout_ref.actor.kl_loss_coef == 0.0) and (config.algorithm.kl_ctrl.kl_coef == 0.0)
+    if not disable_kl:
+        role_worker_mapping[Role.RefPolicy] = ray.remote(ActorRolloutRefWorker)
+        mapping[Role.RefPolicy] = global_pool_id
+    else:
+        print("KL loss is disabled and ref policy is not used!")
 
     # we should adopt a multi-source reward function here
     # - for rule-based rm, we directly call a reward score
