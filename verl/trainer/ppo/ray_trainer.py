@@ -996,14 +996,14 @@ class RayPPOTrainer(object):
                             passk_reward_tensor = 1 - torch.sigmoid(sigmoid_gamma * grouped_response_length_standard).view(-1, 1)
                             passk_reward_tensor = (reward_tensor_mask * passk_reward_tensor) * self.config.trainer.passk_reward_alpha
                             reward_tensor = reward_tensor + passk_reward_tensor
-                            metrics["critic/rewards/length_reward_mean"] = passk_reward_tensor.sum(-1).mean().item()
+                            metrics["critic/rewards/length_add_mean"] = passk_reward_tensor.sum(-1).mean().item()
 
                             # compute the length_reward_signal
                             passk_reward_tensor_signal = passk_reward_tensor.sum(-1)
                             response_length_signal = grouped_response_length_standard.view(-1)
                             response_length_signal = torch.sign(response_length_signal)
                             length_reward_signal = passk_reward_tensor_signal * response_length_signal
-                            metrics["critic/rewards/length_reward_signal"] = length_reward_signal.sum().item()
+                            metrics["critic/rewards/length_minus_mean"] = length_reward_signal.mean().item()
 
                         if self.config.trainer.trajectory_injection:
                             reward_tensor_aggr = reward_tensor.sum(dim=-1)
