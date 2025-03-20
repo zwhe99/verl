@@ -82,9 +82,11 @@ class RLHFDataset(Dataset):
                  tokenizer: PreTrainedTokenizer,
                  processor: Optional[ProcessorMixin] = None,
                  prompt_key='prompt',
+                 response_key=None,
                  rm_system_prompt=False,
                  image_key='images',
                  max_prompt_length=1024,
+                 max_response_length=1024,
                  filter_prompts=True,
                  cache_dir='~/.cache/verl/rlhf',
                  chat_template_func=None,
@@ -101,9 +103,11 @@ class RLHFDataset(Dataset):
         self.processor = processor
 
         self.prompt_key = prompt_key
+        self.response_key = response_key
         self.rm_system_prompt = rm_system_prompt
         self.image_key = image_key
         self.max_prompt_length = max_prompt_length
+        self.max_response_length = max_response_length
         self.filter_prompts = filter_prompts
 
         self.return_raw_chat = return_raw_chat
@@ -218,6 +222,20 @@ class RLHFDataset(Dataset):
         row_dict['attention_mask'] = attention_mask[0]
         row_dict['position_ids'] = position_ids[0]
         row_dict['raw_prompt_ids'] = self.tokenizer.encode(raw_prompt, add_special_tokens=False)
+
+        if self.response_key is not None:
+            assert self.response_key in row_dict, f"response_key ({self.response_key}) not found in dataset"
+            gt_response = row_dict.pop(self.response_key)
+            gt_input_ids, gt_attention_mask = verl_F.tokenize_and_postprocess_data(prompt=gt_response + self.tokenizer.eos_token,
+                                                                                  tokenizer=self.tokenizer,
+                                                                                  max_length=self.max_response_length,
+                                                                                  pad_token_id=self.tokenizer.pad_token_id,
+                                                                                  left_pad=False,
+                                                                                  truncation="right")
+            gt_position_ids = compute_position_id_with_mask(gt_attention_mask)
+            row_dict['gt_response'] = gt_input_ids[0]
+            row_dict['gt_attention_mask'] = gt_attention_mask[0]
+            row_dict['gt_position_ids'] = gt_position_ids[0]
 
         # encode prompts without chat template
         if self.return_raw_chat:

@@ -3,6 +3,7 @@ data:
   train_files: ~/data/rlhf/gsm8k/train.parquet
   val_files: ~/data/rlhf/gsm8k/test.parquet
   prompt_key: prompt
+  response_key: null
   reward_fn_key: data_source
   rm_system_prompt: False
   max_prompt_length: 512
@@ -188,6 +189,8 @@ algorithm:
     enable: False # We try to avoid forgetting to set enable
     metric: null # acc / score / seq_reward / seq_final_reward / ...
     max_num_gen_batches: 0 # Non-positive values mean no upper limit
+  traj_injection:
+    enable: False
 
 trainer:
   balance_batch: True
