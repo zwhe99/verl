@@ -969,66 +969,73 @@ class RayPPOTrainer(object):
                                 prompt_uid2sids[uid].append(sid)
 
                             std_zero_uids = [uid for uid, std in prompt_uid2metric_std.items() if std == 0]
-                            need_inject_sids = torch.tensor([prompt_uid2sids[uid][0] for uid in std_zero_uids])
 
-                            # inject the ground truth response into the batch
-                            new_batch.batch['responses'][need_inject_sids] = new_batch.batch['gt_response'][need_inject_sids]
-                            new_batch.batch['input_ids'] = torch.cat([new_batch.batch['prompts'], new_batch.batch['responses']], dim=-1)
+                            if len(std_zero_uids) == 0:
+                                pass
+                            else:
+                                need_inject_sids = torch.tensor([prompt_uid2sids[uid][0] for uid in std_zero_uids])
 
-                            # modify the `attention_mask`
-                            prompt_attention_mask = new_batch.batch['attention_mask'][:, :max_prompt_length]
-                            response_attention_mask = get_eos_mask(response_id=new_batch.batch['responses'], eos_token=self.tokenizer.eos_token_id, dtype=new_batch.batch['attention_mask'].dtype)
-                            new_batch.batch['attention_mask'] = torch.cat([prompt_attention_mask, response_attention_mask], dim=-1)
+                                # inject the ground truth response into the batch
+                                new_batch.batch['responses'][need_inject_sids] = new_batch.batch['gt_response'][need_inject_sids]
+                                new_batch.batch['input_ids'] = torch.cat([new_batch.batch['prompts'], new_batch.batch['responses']], dim=-1)
 
-                            # modify the `position_ids` (seems not necessary)
-                            prompt_position_ids = new_batch.batch['position_ids'][:, :max_prompt_length]
-                            delta_position_id = torch.arange(1, max_response_length + 1, device=prompt_position_ids.device).unsqueeze(0).repeat(num_of_responses, 1)
-                            response_position_ids = prompt_position_ids[:, -1:] + delta_position_id
-                            new_batch.batch['position_ids'] = torch.cat([prompt_position_ids, response_position_ids], dim=-1)
+                                # modify the `attention_mask`
+                                prompt_attention_mask = new_batch.batch['attention_mask'][:, :max_prompt_length]
+                                response_attention_mask = get_eos_mask(response_id=new_batch.batch['responses'], eos_token=self.tokenizer.eos_token_id, dtype=new_batch.batch['attention_mask'].dtype)
+                                new_batch.batch['attention_mask'] = torch.cat([prompt_attention_mask, response_attention_mask], dim=-1)
 
-                            # remove reward
-                            reward_related_batch_keys = ['token_level_scores', 'token_level_rewards']
-                            reward_related_non_tensor_batch_keys = list(reward_extra_infos_dict.keys())
-                            new_batch.pop(batch_keys=reward_related_batch_keys, non_tensor_batch_keys=reward_related_non_tensor_batch_keys)
+                                # modify the `position_ids` (seems not necessary)
+                                prompt_position_ids = new_batch.batch['position_ids'][:, :max_prompt_length]
+                                delta_position_id = torch.arange(1, max_response_length + 1, device=prompt_position_ids.device).unsqueeze(0).repeat(num_of_responses, 1)
+                                response_position_ids = prompt_position_ids[:, -1:] + delta_position_id
+                                new_batch.batch['position_ids'] = torch.cat([prompt_position_ids, response_position_ids], dim=-1)
 
-                            # recompute the reward
-                            with _timer('reward_recompute', timing_raw):
-                                # compute scores. Support both model and function-based.
-                                # We first compute the scores using reward model. Then, we call reward_fn to combine
-                                # the results from reward model and rule-based results.
-                                if self.use_rm:
-                                    # we first compute reward model score
-                                    reward_tensor = self.rm_wg.compute_rm_score(new_batch)
-                                    new_batch = new_batch.union(reward_tensor)
+                                # remove reward
+                                reward_related_batch_keys = ['token_level_scores', 'token_level_rewards']
+                                reward_related_non_tensor_batch_keys = list(reward_extra_infos_dict.keys())
+                                new_batch.pop(batch_keys=reward_related_batch_keys, non_tensor_batch_keys=reward_related_non_tensor_batch_keys)
 
-                                # we combine with rule-based rm
-                                reward_extra_infos_dict: dict[str, list]
-                                try:
-                                    reward_result = self.reward_fn(new_batch, return_dict=True)
-                                    reward_tensor = reward_result['reward_tensor']
-                                    reward_extra_infos_dict = reward_result['reward_extra_info']
-                                except Exception as e:
-                                    print(f'Error in reward_fn: {e}')
-                                    reward_tensor = self.reward_fn(new_batch)
-                                    reward_extra_infos_dict = {}
+                                # recompute the reward
+                                with _timer('reward_recompute', timing_raw):
+                                    # compute scores. Support both model and function-based.
+                                    # We first compute the scores using reward model. Then, we call reward_fn to combine
+                                    # the results from reward model and rule-based results.
+                                    if self.use_rm:
+                                        # we first compute reward model score
+                                        reward_tensor = self.rm_wg.compute_rm_score(new_batch)
+                                        new_batch = new_batch.union(reward_tensor)
 
-                                new_batch.batch['token_level_scores'] = reward_tensor
+                                    # we combine with rule-based rm
+                                    reward_extra_infos_dict: dict[str, list]
+                                    try:
+                                        reward_result = self.reward_fn(new_batch, return_dict=True)
+                                        reward_tensor = reward_result['reward_tensor']
+                                        reward_extra_infos_dict = reward_result['reward_extra_info']
+                                    except Exception as e:
+                                        print(f'Error in reward_fn: {e}')
+                                        reward_tensor = self.reward_fn(new_batch)
+                                        reward_extra_infos_dict = {}
 
-                                print(f'{list(reward_extra_infos_dict.keys())=}')
-                                if reward_extra_infos_dict:
-                                    new_batch.non_tensor_batch.update({
-                                        k: np.array(v) for k, v in reward_extra_infos_dict.items()
-                                    })
+                                    new_batch.batch['token_level_scores'] = reward_tensor
 
-                                # compute rewards. apply_kl_penalty if available
-                                if not self.config.actor_rollout_ref.actor.get('use_kl_loss', False):
-                                    new_batch, kl_metrics = apply_kl_penalty(new_batch,
-                                                                            kl_ctrl=self.kl_ctrl,
-                                                                            kl_penalty=self.config.algorithm.kl_penalty)
-                                    metrics.update(
-                                        kl_metrics)  # TODO: This will be cleared if we use multiple genenration batches
-                                else:
-                                    new_batch.batch['token_level_rewards'] = new_batch.batch['token_level_scores']
+                                    print(f'{list(reward_extra_infos_dict.keys())=}')
+                                    if reward_extra_infos_dict:
+                                        new_batch.non_tensor_batch.update({
+                                            k: np.array(v) for k, v in reward_extra_infos_dict.items()
+                                        })
+
+                                    # compute rewards. apply_kl_penalty if available
+                                    if not self.config.actor_rollout_ref.actor.get('use_kl_loss', False):
+                                        new_batch, kl_metrics = apply_kl_penalty(new_batch,
+                                                                                kl_ctrl=self.kl_ctrl,
+                                                                                kl_penalty=self.config.algorithm.kl_penalty)
+                                        metrics.update(
+                                            kl_metrics)  # TODO: This will be cleared if we use multiple genenration batches
+                                    else:
+                                        new_batch.batch['token_level_rewards'] = new_batch.batch['token_level_scores']
+
+                            metrics['critic/trajectory_injection_num'] = len(std_zero_uids)
+                            print(f"# Trajectory injection: {len(std_zero_uids)}")
 
                         kept_prompt_uids = [uid for uid, std in prompt_uid2metric_std.items() if std > 0]
                         num_prompt_in_batch += len(kept_prompt_uids)
