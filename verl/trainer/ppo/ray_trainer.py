@@ -517,6 +517,7 @@ class RayPPOTrainer(object):
 
     def _validate(self):
         data_source_lst = []
+        reward_tensor_lst = []
         reward_extra_infos_dict: dict[str, list] = defaultdict(list)
 
         # Lists to collect samples for the table
@@ -575,6 +576,7 @@ class RayPPOTrainer(object):
             # evaluate using reward_function
             result = self.val_reward_fn(test_batch, return_dict=True)
             reward_tensor = result["reward_tensor"]
+            reward_tensor_lst.append(reward_tensor)
             if "reward_extra_info" in result:
                 for key, lst in result["reward_extra_info"].items():
                     reward_extra_infos_dict[key].extend(lst)
@@ -594,14 +596,16 @@ class RayPPOTrainer(object):
         if not os.path.exists(val_path):
             os.makedirs(os.path.dirname(val_path), exist_ok=True)
         with open(val_path, 'w') as f:
-            for si, so, ss, sea in zip(sample_inputs, sample_outputs, sample_scores, sample_expected_answers):
+            extra_keys = list(reward_extra_infos_dict.keys())
+            for si in range(len(sample_inputs)):
                 f.write(
                     json.dumps(
                         {
-                            "prompt": si,
-                            "response": so,
-                            "reward": ss,
-                            "expected_answer": sea
+                            "prompt": sample_inputs[si],
+                            "response": sample_outputs[si],
+                            "reward": sample_scores[si],
+                            "expected_answer": sample_expected_answers[si],
+                            **{k: reward_extra_infos_dict[k][si] for k in extra_keys}
                         },
                         ensure_ascii=False
                     ) + '\n'
@@ -612,70 +616,26 @@ class RayPPOTrainer(object):
         for lst in reward_extra_infos_dict.values():
             assert len(lst) == 0 or len(lst) == len(sample_scores)
 
+        reward_tensor = torch.cat(reward_tensor_lst, dim=0).sum(-1).cpu()  # (batch_size,)
         data_sources = np.concatenate(data_source_lst, axis=0)
 
-        data_src2prompt2var2vals = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        for sample_idx, data_source in enumerate(data_sources):
-            prompt = sample_inputs[sample_idx]
-
-            var2vals = data_src2prompt2var2vals[data_source][prompt]
-            var2vals["final_reward"].append(sample_scores[sample_idx])
-            for metric_name, metric_vals in reward_extra_infos_dict.items():
-                var2vals[metric_name].append(metric_vals[sample_idx])
-
-        data_src2prompt2var2metric = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
-        for data_source, prompt2var2vals in data_src2prompt2var2vals.items():
-            for prompt, var2vals in prompt2var2vals.items():
-                n_resps = len(var2vals["final_reward"])
-                preds = var2vals["pred"]
-                for var_name, var_vals in var2vals.items():
-                    if var_name in ["pred", "final_reward"]:
-                        continue
-                    metric = {}
-
-                    metric[f"mean@{n_resps}"] = np.mean(var_vals)
-                    metric[f"std@{n_resps}"] = np.std(var_vals)
-
-                    ns = []
-                    n = 2
-                    while n < n_resps:
-                        ns.append(n)
-                        n *= 2
-                    ns.append(n_resps)
-
-                    data = [{"val": val, "pred": pred} for val, pred in zip(var_vals, preds)]
-                    for n in ns:
-
-                        (bon_mean, bon_std), (won_mean, won_std), (maj_n_mean, maj_n_std) = bootstrap_metric(
-                            data,
-                            subset_size=n,
-                            reduce_fns=[
-                                lambda arr: np.max([d["val"] for d in arr]),
-                                lambda arr: np.min([d["val"] for d in arr]),
-                                partial(calc_maj_val, vote_key="pred", val_key="val")
-                            ])
-                        metric[f"best@{n}/mean"], metric[f"best@{n}/std"] = bon_mean, bon_std
-                        metric[f"worst@{n}/mean"], metric[f"worst@{n}/std"] = won_mean, won_std
-                        metric[f"maj@{n}/mean"], metric[f"maj@{n}/std"] = maj_n_mean, maj_n_std
-
-                    data_src2prompt2var2metric[data_source][prompt][var_name] = metric
-
-        data_src2var2metric2prompt_vals = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        for data_source, prompt2var2metric in data_src2prompt2var2metric.items():
-            for prompt, var2metric in prompt2var2metric.items():
-                for var_name, metric in var2metric.items():
-                    for metric_name, metric_val in metric.items():
-                        data_src2var2metric2prompt_vals[data_source][var_name][metric_name].append(metric_val)
+        # evaluate test_score based on data source
+        data_source_reward = {}
+        for i in range(reward_tensor.shape[0]):
+            data_source = data_sources[i]
+            if data_source not in data_source_reward:
+                data_source_reward[data_source] = []
+            if "acc" in reward_extra_infos_dict:
+                print(f'using acc in validation')
+                data_source_reward[data_source].append(reward_extra_infos_dict["acc"][i])
+            else:
+                data_source_reward[data_source].append(reward_tensor[i].item())
 
         metric_dict = {}
-        for data_source, var2metric2prompt_vals in data_src2var2metric2prompt_vals.items():
-            for var_name, metric2prompt_vals in var2metric2prompt_vals.items():
-                for metric_name, prompt_vals in metric2prompt_vals.items():
-                    pfx = f"{data_source}/{var_name}/{metric_name}"
-                    metric_dict[pfx] = np.mean(prompt_vals)
+        for data_source, rewards in data_source_reward.items():
+            metric_dict[f'val/test_score/{data_source}'] = np.mean(rewards)
 
-        val_metric_dict = {f"val/{key}": value for key, value in metric_dict.items()}
-        return val_metric_dict
+        return metric_dict
 
     def init_workers(self):
         """Init resource pool and worker group"""
