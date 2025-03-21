@@ -960,9 +960,9 @@ class RayPPOTrainer(object):
                             prompt_uid2metric_std[prompt_uid] = np.std(metric_vals)
 
                         if self.config.algorithm.traj_injection.enable:
-                            max_prompt_length = batch.batch['prompts'].shape[-1]
-                            max_response_length = batch.batch['responses'].shape[-1]
-                            num_of_responses = batch.batch['responses'].shape[0]
+                            max_prompt_length = new_batch.batch['prompts'].shape[-1]
+                            max_response_length = new_batch.batch['responses'].shape[-1]
+                            num_of_responses = new_batch.batch['responses'].shape[0]
 
                             prompt_uid2sids = defaultdict(list)
                             for sid, uid in enumerate(new_batch.non_tensor_batch['uid']):
