@@ -968,6 +968,8 @@ class RayPPOTrainer(object):
                             for sid, uid in enumerate(new_batch.non_tensor_batch['uid']):
                                 prompt_uid2sids[uid].append(sid)
 
+                            # Note: All-correct group will also be injected here since we use std to filter.
+                            # However, it will be filtered out later since its std is still 0.
                             std_zero_uids = [uid for uid, std in prompt_uid2metric_std.items() if std == 0]
 
                             if len(std_zero_uids) == 0:
