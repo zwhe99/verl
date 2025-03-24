@@ -990,6 +990,9 @@ class RayPPOTrainer(object):
                                 response_position_ids = prompt_position_ids[:, -1:] + delta_position_id
                                 new_batch.batch['position_ids'] = torch.cat([prompt_position_ids, response_position_ids], dim=-1)
 
+                                # add a flag to indicate if the response is injected
+                                new_batch.non_tensor_batch['is_injected'] = np.array([sid in need_inject_sids for sid in range(num_of_responses)])
+
                                 # remove reward
                                 reward_related_batch_keys = ['token_level_scores', 'token_level_rewards']
                                 reward_related_non_tensor_batch_keys = list(reward_extra_infos_dict.keys())
@@ -1145,6 +1148,11 @@ class RayPPOTrainer(object):
                                         valid_response_length = data_item.batch['attention_mask'][max_prompt_length:].sum()
                                         valid_response_ids = response_ids[:valid_response_length]
                                         token_level_scores = data_item.batch['token_level_scores']
+                                        expected_answer = data_item.non_tensor_batch['reward_model']['ground_truth']
+                                        if 'is_injected' in data_item.non_tensor_batch:
+                                            is_injected = bool(data_item.non_tensor_batch['is_injected'])
+                                        else:
+                                            is_injected = False
 
                                         # decode
                                         prompt_str = self.tokenizer.decode(valid_prompt_ids)
@@ -1156,7 +1164,8 @@ class RayPPOTrainer(object):
                                             'prompt': prompt_str,
                                             'response': response_str,
                                             'reward': reward_float,
-                                            'expected_answer': data_item.non_tensor_batch['reward_model']['ground_truth']
+                                            'expected_answer': expected_answer,
+                                            'is_injected': is_injected,
                                         })
                                     # sort by uid
                                     rollout_data.sort(key=lambda x: x['uid'])
