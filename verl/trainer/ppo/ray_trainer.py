@@ -968,7 +968,8 @@ class RayPPOTrainer(object):
                         metrics["critic/rewards/outcome_reward_mean"] = grouped_reward_tensor_mean.mean().item()
                         if self.config.trainer.passk_reward:
                             # get the prompt-specific sigmoid_gamma using passk
-                            sigmoid_gamma = self.config.trainer.passk_reward_beta * (grouped_reward_tensor_mean - 0.5).view(-1, 1)
+                            # sigmoid_gamma = self.config.trainer.passk_reward_beta * (grouped_reward_tensor_mean - 0.5).view(-1, 1)
+                            sigmoid_gamma = self.config.trainer.passk_reward_beta * (grouped_reward_tensor_mean - grouped_reward_tensor_mean.mean()).view(-1, 1)
 
                             # get the grouped_response_length of each prompt
                             num_of_responses = batch.batch["responses"].shape[0]
