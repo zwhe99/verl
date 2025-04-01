@@ -1073,8 +1073,12 @@ class RayPPOTrainer(object):
                                 traj_bsz = self.config.data.train_batch_size * self.config.actor_rollout_ref.rollout.n
                                 batch = batch[:traj_bsz]
                             else:
+                                n_gpus = self.config.trainer.n_gpus_per_node * self.config.trainer.nnodes
                                 train_batch_size = len(batch) // self.config.actor_rollout_ref.rollout.n
-                                traj_bsz = train_batch_size * self.config.actor_rollout_ref.rollout.n 
+                                traj_bsz = train_batch_size * self.config.actor_rollout_ref.rollout.n
+                                while traj_bsz % n_gpus != 0:
+                                    train_batch_size -= 1
+                                    traj_bsz = train_batch_size * self.config.actor_rollout_ref.rollout.n
                                 batch = batch[:traj_bsz]
 
                     # balance the number of valid tokens on each dp rank.
