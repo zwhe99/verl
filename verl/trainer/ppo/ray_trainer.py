@@ -1072,6 +1072,10 @@ class RayPPOTrainer(object):
                             if not self.config.algorithm.filter_groups.keep_all_batches:
                                 traj_bsz = self.config.data.train_batch_size * self.config.actor_rollout_ref.rollout.n
                                 batch = batch[:traj_bsz]
+                            else:
+                                train_batch_size = len(batch) // self.config.actor_rollout_ref.rollout.n
+                                traj_bsz = train_batch_size * self.config.actor_rollout_ref.rollout.n 
+                                batch = batch[:traj_bsz]
 
                     # balance the number of valid tokens on each dp rank.
                     # Note that this breaks the order of data inside the batch.
