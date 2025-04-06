@@ -165,7 +165,13 @@ class DataParallelPPOActor(BasePPOActor):
             grad_norm = self.actor_module.clip_grad_norm_(max_norm=self.config.grad_clip)
         else:
             grad_norm = torch.nn.utils.clip_grad_norm_(self.actor_module.parameters(), max_norm=self.config.grad_clip)
-        self.actor_optimizer.step()
+
+        if self.config.max_grad_norm is not None and grad_norm > self.config.max_grad_norm:
+            print(f"WARN: grad_norm is too large: {grad_norm}, skip the update")
+            self.actor_optimizer.zero_grad()
+        else:
+            self.actor_optimizer.step()
+
         return grad_norm
 
     def compute_log_prob(self, data: DataProto) -> torch.Tensor:
