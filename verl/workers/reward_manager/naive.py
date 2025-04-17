@@ -173,9 +173,9 @@ class NaiveRewardManager:
             # compute pass ratio for each group
             group_size = self.config.actor_rollout_ref.rollout.n
             group_acc_lst = [acc_lst[i : i + group_size] for i in range(0, len(acc_lst), group_size)]
-            assert len(group_acc_lst) == self.config.actor_rollout_ref.actor.ppo_mini_batch_size
+            assert len(group_acc_lst) == self.config.data.gen_batch_size
             group_acc_lst_mean = [sum(group_reward) / len(group_reward) for group_reward in group_acc_lst]
-            reward_extra_info["group_acc_lst_mean"] = group_acc_lst_mean
+            # reward_extra_info["group_acc_lst_mean"] = group_acc_lst_mean
 
             # get the prompt-specific sigmoid_gamma using pass ratio
             group_acc_mean = sum(group_acc_lst_mean) / len(group_acc_lst_mean)
