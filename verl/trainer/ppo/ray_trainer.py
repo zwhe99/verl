@@ -919,6 +919,59 @@ class RayPPOTrainer(object):
                             reward_tensor = self.reward_fn(new_batch)
                             reward_extra_infos_dict = {}
 
+                        ########## Beginning of Length Reward ##########
+                        # record the outcome_reward before adding length_reward
+                        reward_tensor_aggr = reward_tensor.sum(dim=-1)
+                        grouped_reward_tensor = reward_tensor_aggr.view(-1, self.config.actor_rollout_ref.rollout.n)
+                        grouped_reward_tensor_mean = grouped_reward_tensor.mean(dim=-1)
+                        metrics["critic/rewards/outcome_reward_mean"] = grouped_reward_tensor_mean.mean().item()
+
+                        if self.config.algorithm.length_reward.enable:
+                            # get the prompt-specific sigmoid_gamma using passk
+                            sigmoid_gamma = self.config.algorithm.length_reward.sigmoid_param * (
+                                grouped_reward_tensor_mean - grouped_reward_tensor_mean.mean()
+                            ).view(-1, 1)
+
+                            # get the grouped_response_length of each prompt
+                            num_of_responses = batch.batch["responses"].shape[0]
+                            max_prompt_length = batch.batch["prompts"].shape[-1]
+                            rows = torch.arange(num_of_responses)
+                            cols = batch.batch["attention_mask"][:, max_prompt_length:].sum(dim=-1) - 1
+                            grouped_response_length = cols.view(-1, self.config.actor_rollout_ref.rollout.n)
+
+                            # standardize the grouped_response_length
+                            mean = grouped_response_length.float().mean(dim=1).view(-1, 1)
+                            std = grouped_response_length.float().std(dim=1).view(-1, 1)
+                            grouped_response_length_standard = (grouped_response_length - mean) / (std + 1e-7)
+
+                            # when turn on length_reward.only_correct, set the length_reward to 0 if the response is incorrect
+                            if self.config.algorithm.length_reward.only_correct:
+                                # +++++++++++++++++++++++++++ #
+                                # only support for 0/1 reward #
+                                # +++++++++++++++++++++++++++ #
+                                reward_tensor_mask = reward_tensor.bool()
+                            else:
+                                reward_tensor_mask = torch.zeros_like(reward_tensor, dtype=torch.bool)
+                                reward_tensor_mask[rows, cols] = True
+
+                            # compute the length_reward and add it to the reward_tensor
+                            length_reward_tensor = 1 - torch.sigmoid(sigmoid_gamma * grouped_response_length_standard).view(
+                                -1, 1
+                            )
+                            length_reward_tensor = (
+                                reward_tensor_mask * length_reward_tensor
+                            ) * self.config.algorithm.length_reward.weight
+                            reward_tensor = reward_tensor + length_reward_tensor
+                            metrics["critic/rewards/length_add_mean"] = length_reward_tensor.sum(-1).mean().item()
+
+                            # compute the length_reward_signal
+                            length_reward_tensor_signal = length_reward_tensor.sum(-1)
+                            response_length_signal = grouped_response_length_standard.view(-1)
+                            response_length_signal = torch.sign(response_length_signal)
+                            length_reward_signal = length_reward_tensor_signal * response_length_signal
+                            metrics["critic/rewards/length_minus_mean"] = length_reward_signal.mean().item()
+                        ########## End of Length Reward ##########
+
                         new_batch.batch['token_level_scores'] = reward_tensor
 
                         print(f'{list(reward_extra_infos_dict.keys())=}')

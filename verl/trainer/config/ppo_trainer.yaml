@@ -193,6 +193,11 @@ algorithm:
     keep_all_batches: False
   traj_injection:
     enable: False
+  length_reward:
+    enable: False
+    only_correct: False
+    weight: 0.1
+    sigmoid_param: 1
 
 trainer:
   balance_batch: True
