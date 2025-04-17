@@ -933,10 +933,10 @@ class RayPPOTrainer(object):
                             ).view(-1, 1)
 
                             # get the grouped_response_length of each prompt
-                            num_of_responses = batch.batch["responses"].shape[0]
-                            max_prompt_length = batch.batch["prompts"].shape[-1]
+                            num_of_responses = new_batch.batch["responses"].shape[0]
+                            max_prompt_length = new_batch.batch["prompts"].shape[-1]
                             rows = torch.arange(num_of_responses)
-                            cols = batch.batch["attention_mask"][:, max_prompt_length:].sum(dim=-1) - 1
+                            cols = new_batch.batch["attention_mask"][:, max_prompt_length:].sum(dim=-1) - 1
                             grouped_response_length = cols.view(-1, self.config.actor_rollout_ref.rollout.n)
 
                             # standardize the grouped_response_length
