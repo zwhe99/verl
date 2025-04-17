@@ -177,6 +177,11 @@ custom_reward_function:
     len: 0
     penalty_factor: 0.0
     log: False
+  length_reward:
+    enable: False
+    only_correct: False
+    weight: 0.1
+    sigmoid_param: 1
 
 algorithm:
   gamma: 1.0
@@ -193,11 +198,6 @@ algorithm:
     keep_all_batches: False
   traj_injection:
     enable: False
-  length_reward:
-    enable: False
-    only_correct: False
-    weight: 0.1
-    sigmoid_param: 1
 
 trainer:
   balance_batch: True

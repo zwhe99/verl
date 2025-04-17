@@ -26,19 +26,23 @@ class NaiveRewardManager:
     """The reward manager.
     """
 
-    def __init__(self,
-                 tokenizer,
-                 num_examine,
-                 compute_score=None,
-                 reward_fn_key='data_source',
-                 max_resp_len=None,
-                 overlong_buffer_cfg=None) -> None:
+    def __init__(
+        self,
+        tokenizer,
+        num_examine,
+        compute_score=None,
+        reward_fn_key="data_source",
+        max_resp_len=None,
+        overlong_buffer_cfg=None,
+        config=None,
+    ) -> None:
         self.tokenizer = tokenizer
         self.num_examine = num_examine  # the number of batches of decoded responses to print to the console
         self.compute_score = compute_score or _default_compute_score
         self.reward_fn_key = reward_fn_key
         self.overlong_buffer_cfg = overlong_buffer_cfg
         self.max_resp_len = max_resp_len
+        self.config = config
 
         if self.overlong_buffer_cfg is not None:
             assert self.max_resp_len is not None, f"max_resp_len must be provided if {overlong_buffer_cfg=}, but got None"
@@ -130,7 +134,6 @@ class NaiveRewardManager:
             for s in solution_str_lst
         ]
 
-
         # get ground truth list
         ground_truth_lst = [
             data[i].non_tensor_batch['reward_model']['ground_truth']
@@ -154,15 +157,59 @@ class NaiveRewardManager:
 
         if isinstance(result_lst[0], dict):
             score_lst = [result['score'] for result in result_lst]
+            acc_lst = [result["acc"] for result in result_lst]
             for r in result_lst:
                 for k, v in r.items():
                     reward_extra_info[k].append(v)
         else:
             score_lst = result_lst
 
+        # `acc`: correctness from reward function
         # `score`: score from reward function
         # `reward`: consider overlong buffer
         reward_lst = deepcopy(score_lst)
+
+        if self.config.custom_reward_function.length_reward.enable:
+            # compute pass ratio for each group
+            group_size = self.config.actor_rollout_ref.rollout.n
+            group_acc_lst = [acc_lst[i : i + group_size] for i in range(0, len(acc_lst), group_size)]
+            assert len(group_acc_lst) == self.config.actor_rollout_ref.actor.ppo_mini_batch_size
+            group_acc_lst_mean = [sum(group_reward) / len(group_reward) for group_reward in group_acc_lst]
+            reward_extra_info["group_acc_lst_mean"] = group_acc_lst_mean
+
+            # get the prompt-specific sigmoid_gamma using pass ratio
+            group_acc_mean = sum(group_acc_lst_mean) / len(group_acc_lst_mean)
+            sigmoid_param = self.config.custom_reward_function.length_reward.sigmoid_param
+            sigmoid_gamma = [sigmoid_param * (group_acc - group_acc_mean) for group_acc in group_acc_lst_mean]
+
+            # standardize the response length for each group
+            group_valid_response_length = [
+                valid_response_length[i : i + group_size] for i in range(0, len(valid_response_length), group_size)
+            ]
+            mean = [sum(group_valid_l) / len(group_valid_l) for group_valid_l in group_valid_response_length]
+            std = [
+                (sum([(l - m) ** 2 for l in group_valid_l]) / len(group_valid_l)) ** 0.5
+                for group_valid_l, m in zip(group_valid_response_length, mean)
+            ]
+            group_standard_response_length = [
+                [(l - m) / s if s > 0 else 0 for l in group_valid_l]
+                for group_valid_l, m, s in zip(group_valid_response_length, mean, std)
+            ]
+
+            # compute the length reward using sigmoid function
+            length_reward_sigmoid = [
+                1 / (1 + torch.exp(-gamma * l))
+                for gamma, standard_l in zip(sigmoid_gamma, group_standard_response_length)
+                for l in standard_l
+            ]
+            weight = self.config.custom_reward_function.length_reward.weight
+            if self.config.custom_reward_function.length_reward.only_correct:
+                length_reward_mask = acc_lst
+            else:
+                length_reward_mask = [1] * len(acc_lst)
+            length_reward = [weight * (1 - r) * mask for r, mask in zip(length_reward_sigmoid, length_reward_mask)]
+            reward_extra_info["length_reward"] = length_reward
+            reward_lst = [r + l for r, l in zip(reward_lst, length_reward)]
 
         if self.overlong_buffer_cfg.enable:
             overlong_buffer_len = self.overlong_buffer_cfg.len
