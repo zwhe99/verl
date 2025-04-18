@@ -191,6 +191,7 @@ algorithm:
     metric: null # acc / score / seq_reward / seq_final_reward / ...
     max_num_gen_batches: 0 # Non-positive values mean no upper limit
     keep_all_batches: False
+    keep_by_std: False
   traj_injection:
     enable: False
 

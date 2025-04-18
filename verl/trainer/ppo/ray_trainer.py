@@ -322,6 +322,7 @@ class RayPPOTrainer(object):
         if filter_cfg.enable:
             assert filter_cfg.max_num_gen_batches > 0, f"{filter_cfg.max_num_gen_batches=}"
             assert filter_cfg.metric is not None, f"{filter_cfg.metric=}"
+            assert not (filter_cfg.keep_by_std and filter_cfg.keep_all_batches), f"keep_by_std and keep_all_batches cannot be both True"
         else:
             assert config.data.train_batch_size == config.data.gen_batch_size, \
                 f"train_batch_size must be equal to gen_batch_size when filter_groups.enable is False, but got {config.data.train_batch_size =} and {config.data.gen_batch_size =}"
@@ -1066,8 +1067,10 @@ class RayPPOTrainer(object):
                         new_batch = new_batch[kept_traj_idxs]
                         if batch is None:
                             batch = new_batch
+                            all_prompt_uid2metric_std = {}
                         else:
                             batch = DataProto.concat([batch, new_batch])
+                            all_prompt_uid2metric_std.update({k: v for k, v in prompt_uid2metric_std.items() if k in kept_prompt_uids})
 
                         prompt_bsz = self.config.data.train_batch_size
                         if num_prompt_in_batch < prompt_bsz:
@@ -1084,7 +1087,19 @@ class RayPPOTrainer(object):
                             # Align the batch
                             if not self.config.algorithm.filter_groups.keep_all_batches:
                                 traj_bsz = self.config.data.train_batch_size * self.config.actor_rollout_ref.rollout.n
-                                batch = batch[:traj_bsz]
+                                if not self.config.algorithm.filter_groups.keep_by_std:
+                                    batch = batch[:traj_bsz]
+                                else:
+                                    print(f'Keep data by std ...')
+                                    # sort prompt_uid by std from high to low
+                                    sorted_prompt_uids = sorted(all_prompt_uid2metric_std.keys(), key=lambda x: all_prompt_uid2metric_std[x], reverse=True)
+                                    high_std_prompt_uids = sorted_prompt_uids[:self.config.data.train_batch_size]
+                                    high_std_traj_indices = []
+                                    for idx, uid in enumerate(batch.non_tensor_batch['uid']):
+                                        if uid in high_std_prompt_uids:
+                                            high_std_traj_indices.append(idx)
+                                    assert len(high_std_traj_indices) == traj_bsz, f'{len(high_std_traj_indices)=} != {traj_bsz=}'
+                                    batch = batch[high_std_traj_indices]
                             else:
                                 n_gpus = self.config.trainer.n_gpus_per_node * self.config.trainer.nnodes
                                 train_batch_size = len(batch) // self.config.actor_rollout_ref.rollout.n
