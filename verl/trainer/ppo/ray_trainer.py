@@ -1039,6 +1039,16 @@ class RayPPOTrainer(object):
                                     else:
                                         new_batch.batch['token_level_rewards'] = new_batch.batch['token_level_scores']
 
+                                # recompute the prompt_uid2metric_std
+                                prompt_uid2metric_vals = defaultdict(list)
+                                for uid, metric_val in zip(new_batch.non_tensor_batch['uid'],
+                                                           new_batch.non_tensor_batch[metric_name]):
+                                    prompt_uid2metric_vals[uid].append(metric_val)
+
+                                prompt_uid2metric_std = {}
+                                for prompt_uid, metric_vals in prompt_uid2metric_vals.items():
+                                    prompt_uid2metric_std[prompt_uid] = np.std(metric_vals)
+
                             metrics['critic/trajectory_injection_num'] = len(std_zero_uids)
                             print(f"# Trajectory injection: {len(std_zero_uids)}")
 
