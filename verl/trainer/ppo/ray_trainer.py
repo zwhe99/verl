@@ -964,18 +964,21 @@ class RayPPOTrainer(object):
                             max_response_length = new_batch.batch['responses'].shape[-1]
                             num_of_responses = new_batch.batch['responses'].shape[0]
 
+                            prompt_uid2metric_mean = {}
+                            for prompt_uid, metric_vals in prompt_uid2metric_vals.items():
+                                prompt_uid2metric_mean[prompt_uid] = np.mean(metric_vals)
+
                             prompt_uid2sids = defaultdict(list)
                             for sid, uid in enumerate(new_batch.non_tensor_batch['uid']):
                                 prompt_uid2sids[uid].append(sid)
 
-                            # Note: All-correct group will also be injected here since we use std to filter.
-                            # However, it will be filtered out later since its std is still 0.
-                            std_zero_uids = [uid for uid, std in prompt_uid2metric_std.items() if std == 0]
+                            # TODO: the min of mean might not be 0
+                            mean_zero_uids = [uid for uid, mean in prompt_uid2metric_mean.items() if mean == 0]
 
-                            if len(std_zero_uids) == 0:
+                            if len(mean_zero_uids) == 0:
                                 pass
                             else:
-                                need_inject_sids = torch.tensor([prompt_uid2sids[uid][0] for uid in std_zero_uids])
+                                need_inject_sids = torch.tensor([prompt_uid2sids[uid][0] for uid in mean_zero_uids])
 
                                 # inject the ground truth response into the batch
                                 new_batch.batch['responses'][need_inject_sids] = new_batch.batch['gt_response'][need_inject_sids]
