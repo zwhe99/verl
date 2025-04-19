@@ -1067,7 +1067,7 @@ class RayPPOTrainer(object):
                         new_batch = new_batch[kept_traj_idxs]
                         if batch is None:
                             batch = new_batch
-                            all_prompt_uid2metric_std = {}
+                            all_prompt_uid2metric_std = {k: v for k, v in prompt_uid2metric_std.items() if k in kept_prompt_uids}
                         else:
                             batch = DataProto.concat([batch, new_batch])
                             all_prompt_uid2metric_std.update({k: v for k, v in prompt_uid2metric_std.items() if k in kept_prompt_uids})
