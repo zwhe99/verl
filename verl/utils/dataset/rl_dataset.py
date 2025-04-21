@@ -236,6 +236,7 @@ class RLHFDataset(Dataset):
             row_dict['gt_response'] = gt_input_ids[0]
             row_dict['gt_attention_mask'] = gt_attention_mask[0]
             row_dict['gt_position_ids'] = gt_position_ids[0]
+            row_dict['gt_is_cliped'] = gt_input_ids.shape[-1] == self.max_response_length
 
         # encode prompts without chat template
         if self.return_raw_chat:

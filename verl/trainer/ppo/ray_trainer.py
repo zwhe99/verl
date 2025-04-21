@@ -960,6 +960,11 @@ class RayPPOTrainer(object):
                         for prompt_uid, metric_vals in prompt_uid2metric_vals.items():
                             prompt_uid2metric_std[prompt_uid] = np.std(metric_vals)
 
+                        prompt_uid2is_cliped = defaultdict(bool)
+                        for prompt_uid, is_cliped in zip(new_batch.non_tensor_batch['uid'],
+                                                        new_batch.non_tensor_batch['is_cliped']):
+                            prompt_uid2is_cliped[prompt_uid] |= is_cliped
+
                         if self.config.algorithm.traj_injection.enable:
                             max_prompt_length = new_batch.batch['prompts'].shape[-1]
                             max_response_length = new_batch.batch['responses'].shape[-1]
@@ -984,6 +989,7 @@ class RayPPOTrainer(object):
                                 # inject the ground truth response into the batch
                                 new_batch.batch['responses'][need_inject_sids] = new_batch.batch['gt_response'][need_inject_sids]
                                 new_batch.batch['input_ids'] = torch.cat([new_batch.batch['prompts'], new_batch.batch['responses']], dim=-1)
+                                new_batch.non_tensor_batch['is_cliped'][need_inject_sids] = new_batch.batch['gt_is_cliped'][need_inject_sids] # TODO: is `new_batch.non_tensor_batch['is_cliped']` a np.array?
 
                                 # modify the `attention_mask`
                                 prompt_attention_mask = new_batch.batch['attention_mask'][:, :max_prompt_length]
@@ -1053,10 +1059,19 @@ class RayPPOTrainer(object):
                                 for prompt_uid, metric_vals in prompt_uid2metric_vals.items():
                                     prompt_uid2metric_std[prompt_uid] = np.std(metric_vals)
 
+                                prompt_uid2is_cliped = defaultdict(bool)
+                                for prompt_uid, is_cliped in zip(new_batch.non_tensor_batch['uid'],
+                                                                new_batch.non_tensor_batch['is_cliped']):
+                                    prompt_uid2is_cliped[prompt_uid] |= is_cliped
+
                             metrics['critic/trajectory_injection_num'] = len(mean_zero_uids)
                             print(f"# Trajectory injection: {len(mean_zero_uids)}")
 
                         kept_prompt_uids = [uid for uid, std in prompt_uid2metric_std.items() if std > 0]
+                        if self.config.algorithm.filter_groups.discard_cliped:
+                            print(f"# Discard cliped: {len([uid for uid in kept_prompt_uids if prompt_uid2is_cliped[uid]])}")
+                            kept_prompt_uids = [uid for uid in kept_prompt_uids if not prompt_uid2is_cliped[uid]]
+
                         num_prompt_in_batch += len(kept_prompt_uids)
 
                         kept_traj_idxs = []

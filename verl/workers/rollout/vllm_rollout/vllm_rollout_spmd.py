@@ -218,9 +218,11 @@ class vLLMRollout(BaseRollout):
             # if n = 1: (bs, response_length) ; if n > 1: (bs * n, response_length)
 
             response = []
+            is_cliped = []
             for output in outputs:
                 for sample_id in range(len(output.outputs)):
                     response.append(output.outputs[sample_id].token_ids)
+                    is_cliped.append(output.outputs[sample_id].finish_reason == "length")
 
             response = pad_2d_list_to_length(response, self.pad_token_id,
                                              max_length=self.config.response_length).to(idx.device)
@@ -262,6 +264,8 @@ class vLLMRollout(BaseRollout):
                 'position_ids': position_ids
             },
             batch_size=batch_size)
+
+        non_tensor_batch['is_cliped'] = is_cliped
 
         # free vllm cache engine
         if vllm_version in ('0.3.1', '0.4.2', '0.5.4', '0.6.3') and self.config.free_cache_engine:
