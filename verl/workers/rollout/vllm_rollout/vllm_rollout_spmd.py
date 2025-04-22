@@ -265,7 +265,7 @@ class vLLMRollout(BaseRollout):
             },
             batch_size=batch_size)
 
-        non_tensor_batch['is_cliped'] = is_cliped
+        non_tensor_batch['is_cliped'] = np.array(is_cliped)
 
         # free vllm cache engine
         if vllm_version in ('0.3.1', '0.4.2', '0.5.4', '0.6.3') and self.config.free_cache_engine:
