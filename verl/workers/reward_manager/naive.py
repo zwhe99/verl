@@ -178,10 +178,11 @@ class NaiveRewardManager:
             # reward_extra_info["group_acc_lst_mean"] = group_acc_lst_mean
 
             # get the prompt-specific sigmoid_gamma using pass ratio
-            if self.config.custom_reward_function.length_reward.group_acc_mean:
-                group_acc_mean = self.config.custom_reward_function.length_reward.group_acc_mean
-            else:
-                group_acc_mean = sum(group_acc_lst_mean) / len(group_acc_lst_mean)
+            group_acc_mean = sum(group_acc_lst_mean) / len(group_acc_lst_mean)
+            # if self.config.custom_reward_function.length_reward.group_acc_mean:
+            #     group_acc_mean = self.config.custom_reward_function.length_reward.group_acc_mean
+            # else:
+            #     group_acc_mean = sum(group_acc_lst_mean) / len(group_acc_lst_mean)
             sigmoid_param = self.config.custom_reward_function.length_reward.sigmoid_param
             sigmoid_gamma = [sigmoid_param * (group_acc - group_acc_mean) for group_acc in group_acc_lst_mean]
 
@@ -199,12 +200,22 @@ class NaiveRewardManager:
                 for group_valid_l, m, s in zip(group_valid_response_length, mean, std)
             ]
 
+            group_ablation_mask = [1] * len(group_acc_lst)
+            if self.config.custom_reward_function.length_reward.ablation.enable:
+                if self.config.custom_reward_function.length_reward.ablation.direction == 0.0:
+                    group_ablation_mask = [1 if group_acc > group_acc_mean else 0 for group_acc in group_acc_lst_mean]
+                elif self.config.custom_reward_function.length_reward.ablation.direction == 1.0:
+                    group_ablation_mask = [1 if group_acc < group_acc_mean else 0 for group_acc in group_acc_lst_mean]
+                else:
+                    raise ValueError("Invalid direction value. Must be 0.0 (shorten) or 1.0 (lengthen).")
+
             # compute the length reward using sigmoid function
             length_reward_sigmoid = [
-                1 / (1 + torch.exp(-gamma * l))
-                for gamma, standard_l in zip(sigmoid_gamma, group_standard_response_length)
+                1 / (1 + torch.exp(-gamma * l)) * mask
+                for gamma, standard_l, mask in zip(sigmoid_gamma, group_standard_response_length, group_ablation_mask)
                 for l in standard_l
             ]
+
             weight = self.config.custom_reward_function.length_reward.weight
             if self.config.custom_reward_function.length_reward.only_correct:
                 length_reward_mask = acc_lst

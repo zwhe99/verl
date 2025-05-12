@@ -183,6 +183,9 @@ custom_reward_function:
     group_acc_mean: null
     weight: 0.1
     sigmoid_param: 1
+    ablation:
+      enable: False
+      direction: 0.0
 
 algorithm:
   gamma: 1.0
