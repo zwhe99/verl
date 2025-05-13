@@ -200,28 +200,33 @@ class NaiveRewardManager:
                 for group_valid_l, m, s in zip(group_valid_response_length, mean, std)
             ]
 
-            group_ablation_mask = [1] * len(group_acc_lst)
-            if self.config.custom_reward_function.length_reward.ablation.enable:
-                if self.config.custom_reward_function.length_reward.ablation.direction == 0.0:
-                    group_ablation_mask = [1 if group_acc > group_acc_mean else 0 for group_acc in group_acc_lst_mean]
-                elif self.config.custom_reward_function.length_reward.ablation.direction == 1.0:
-                    group_ablation_mask = [1 if group_acc < group_acc_mean else 0 for group_acc in group_acc_lst_mean]
-                else:
-                    raise ValueError("Invalid direction value. Must be 0.0 (shorten) or 1.0 (lengthen).")
-
             # compute the length reward using sigmoid function
+            weight = self.config.custom_reward_function.length_reward.weight
             length_reward_sigmoid = [
-                1 / (1 + torch.exp(-gamma * l)) * mask
-                for gamma, standard_l, mask in zip(sigmoid_gamma, group_standard_response_length, group_ablation_mask)
+                weight * (1 - 1 / (1 + torch.exp(-gamma * l)))
+                for gamma, standard_l in zip(sigmoid_gamma, group_standard_response_length)
                 for l in standard_l
             ]
 
-            weight = self.config.custom_reward_function.length_reward.weight
+            # mask for only correct samples
             if self.config.custom_reward_function.length_reward.only_correct:
-                length_reward_mask = acc_lst
+                only_correct_mask = acc_lst
             else:
-                length_reward_mask = [1] * len(acc_lst)
-            length_reward = [weight * (1 - r) * mask for r, mask in zip(length_reward_sigmoid, length_reward_mask)]
+                only_correct_mask = [1] * len(acc_lst)
+
+            # mask for ablation samples
+            # 0.0: shorten, 1.0: lengthen
+            ablation_mask = [1] * len(acc_lst)
+            if self.config.custom_reward_function.length_reward.ablation.enable:
+                if self.config.custom_reward_function.length_reward.ablation.direction == 0.0:
+                    ablation_mask = [1 if group_acc > group_acc_mean else 0 for group_acc in group_acc_lst_mean for _ in range(group_size)]
+                elif self.config.custom_reward_function.length_reward.ablation.direction == 1.0:
+                    ablation_mask = [1 if group_acc < group_acc_mean else 0 for group_acc in group_acc_lst_mean for _ in range(group_size)]
+                else:
+                    raise ValueError("Invalid direction value. Must be 0.0 (shorten) or 1.0 (lengthen).")
+
+            length_reward = [r * oc_mask * abla_mask for r, oc_mask, abla_mask in zip(length_reward_sigmoid, only_correct_mask, ablation_mask)]
+
             reward_extra_info["length_reward"] = length_reward
             reward_lst = [r + l for r, l in zip(reward_lst, length_reward)]
 
