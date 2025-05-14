@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from verl import DataProto
-from verl.utils.reward_score import _default_compute_score
 import torch
 import ray
+import math
+
+from verl import DataProto
+from verl.utils.reward_score import _default_compute_score
 from collections import defaultdict
 from copy import deepcopy
 
@@ -203,7 +205,7 @@ class NaiveRewardManager:
             # compute the length reward using sigmoid function
             weight = self.config.custom_reward_function.length_reward.weight
             length_reward_sigmoid = [
-                weight * (1 - 1 / (1 + torch.exp(-gamma * l)))
+                weight * (1 - 1 / (1 + math.exp(-gamma * l)))
                 for gamma, standard_l in zip(sigmoid_gamma, group_standard_response_length)
                 for l in standard_l
             ]
