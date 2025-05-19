@@ -26,5 +26,5 @@ algorithm:
 trainer:
   entity_name: null
   project_name: verl-dapo
-  rrun_id: null
+  run_id: null
   save_rollout: False
