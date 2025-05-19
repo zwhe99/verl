@@ -16,7 +16,9 @@ FSDP PPO Trainer with Ray-based single controller.
 This trainer supports model-agonistic model initialization with huggingface
 """
 
+import os
 import uuid
+import json
 from collections import defaultdict
 from copy import deepcopy
 from pprint import pprint
@@ -52,8 +54,10 @@ class RayDAPOTrainer(RayPPOTrainer):
         from verl.utils.tracking import Tracking
 
         logger = Tracking(
+            entity_name=self.config.trainer.entity_name,
             project_name=self.config.trainer.project_name,
             experiment_name=self.config.trainer.experiment_name,
+            run_id=self.config.trainer.run_id,
             default_backend=self.config.trainer.logger,
             config=OmegaConf.to_container(self.config, resolve=True),
         )
@@ -272,6 +276,41 @@ class RayDAPOTrainer(RayPPOTrainer):
                     if self.config.trainer.save_freq > 0 and (is_last_step or self.global_steps % self.config.trainer.save_freq == 0):
                         with _timer("save_checkpoint", timing_raw):
                             self._save_checkpoint()
+                            if self.config.trainer.save_rollout:
+                                with _timer('save_rollout', timing_raw):
+                                    rollout_data = []
+                                    for i in range(len(batch)):
+                                        data_uid = batch.non_tensor_batch['uid'][i]
+                                        data_item = batch[i]  # DataProtoItem
+                                        prompt_ids = data_item.batch['prompts']
+                                        max_prompt_length = prompt_ids.shape[-1]
+                                        valid_prompt_length = data_item.batch['attention_mask'][:max_prompt_length].sum()
+                                        valid_prompt_ids = prompt_ids[-valid_prompt_length:]
+                                        response_ids = data_item.batch['responses']
+                                        valid_response_length = data_item.batch['attention_mask'][max_prompt_length:].sum()
+                                        valid_response_ids = response_ids[:valid_response_length]
+                                        token_level_scores = data_item.batch['token_level_scores']
+                                        expected_answer = data_item.non_tensor_batch['reward_model']['ground_truth']
+
+                                        # decode
+                                        prompt_str = self.tokenizer.decode(valid_prompt_ids)
+                                        response_str = self.tokenizer.decode(valid_response_ids)
+                                        reward_float = token_level_scores[valid_response_length - 1].item()
+
+                                        rollout_data.append({
+                                            "uid": data_uid,
+                                            'prompt': prompt_str,
+                                            'response': response_str,
+                                            'reward': reward_float,
+                                            'expected_answer': expected_answer,
+                                        })
+
+                                    # sort by uid
+                                    rollout_data.sort(key=lambda x: x['uid'])
+                                    rollout_path = os.path.join(self.config.trainer.default_local_dir, f'global_step_{self.global_steps}', 'rollout.jsonl')
+                                    with open(rollout_path, "w", encoding="utf-8") as f:
+                                        for rd in rollout_data:
+                                            f.write(json.dumps(rd, ensure_ascii=False) + "\n")
 
                 # collect metrics
                 metrics.update(compute_data_metrics(batch=batch, use_critic=self.use_critic))
