@@ -91,11 +91,12 @@ class TaskRunner:
         processor = hf_processor(local_path, use_fast=True)  # used for multimodal LLM, could be none
 
         # define worker classes
-        if config.actor_rollout_ref.actor.strategy == "fsdp":
-            assert config.actor_rollout_ref.actor.strategy == config.critic.strategy
+        if config.actor_rollout_ref.actor.strategy in ["fsdp", "fsdp2"]:
+            assert config.critic.strategy in ["fsdp", "fsdp2"]
             from verl.single_controller.ray import RayWorkerGroup
-            from verl.workers.fsdp_workers import ActorRolloutRefWorker, CriticWorker
+            from verl.workers.fsdp_workers import ActorRolloutRefWorker, AsyncActorRolloutRefWorker, CriticWorker
 
+            actor_rollout_cls = AsyncActorRolloutRefWorker if config.actor_rollout_ref.rollout.mode == "async" else ActorRolloutRefWorker
             ray_worker_group_cls = RayWorkerGroup
 
         elif config.actor_rollout_ref.actor.strategy == "megatron":
@@ -103,6 +104,7 @@ class TaskRunner:
             from verl.single_controller.ray.megatron import NVMegatronRayWorkerGroup
             from verl.workers.megatron_workers import ActorRolloutRefWorker, CriticWorker
 
+            actor_rollout_cls = ActorRolloutRefWorker
             ray_worker_group_cls = NVMegatronRayWorkerGroup
 
         else:
@@ -111,9 +113,8 @@ class TaskRunner:
         from verl.trainer.ppo.ray_trainer import ResourcePoolManager, Role
 
         role_worker_mapping = {
-            Role.ActorRollout: ray.remote(ActorRolloutRefWorker),
+            Role.ActorRollout: ray.remote(actor_rollout_cls),
             Role.Critic: ray.remote(CriticWorker),
-            Role.RefPolicy: ray.remote(ActorRolloutRefWorker),
         }
 
         global_pool_id = "global_pool"
@@ -123,7 +124,6 @@ class TaskRunner:
         mapping = {
             Role.ActorRollout: global_pool_id,
             Role.Critic: global_pool_id,
-            Role.RefPolicy: global_pool_id,
         }
 
         # we should adopt a multi-source reward function here
@@ -133,7 +133,7 @@ class TaskRunner:
         # - finally, we combine all the rewards together
         # - The reward type depends on the tag of the data
         if config.reward_model.enable:
-            if config.reward_model.strategy == "fsdp":
+            if config.reward_model.strategy in ["fsdp", "fsdp2"]:
                 from verl.workers.fsdp_workers import RewardModelWorker
             elif config.reward_model.strategy == "megatron":
                 from verl.workers.megatron_workers import RewardModelWorker
@@ -142,7 +142,7 @@ class TaskRunner:
             role_worker_mapping[Role.RewardModel] = ray.remote(RewardModelWorker)
             mapping[Role.RewardModel] = global_pool_id
 
-        # reference model
+        # use reference model
         if config.algorithm.use_kl_in_reward or config.actor_rollout_ref.actor.use_kl_loss:
             role_worker_mapping[Role.RefPolicy] = ray.remote(ActorRolloutRefWorker)
             mapping[Role.RefPolicy] = global_pool_id
