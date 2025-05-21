@@ -245,7 +245,7 @@ class NaiveRewardManager:
 
         if self.config.custom_reward_function.valid_buffer.enable:
             assert self.overlong_buffer_cfg.enable, "overlong_buffer_cfg.enable must be True if length_buffer.enable is True"
-            valid_penalty_factor = self.valid_buffer.penalty_factor
+            valid_penalty_factor = self.config.custom_reward_function.valid_buffer.penalty_factor
             valid_ratio_lst = [valid_response_length[i] / expected_len if valid_response_length[i] <= expected_len else 0 for i in range(len(data))]
             valid_reward_lst = [ratio * valid_penalty_factor for ratio in valid_ratio_lst]
             reward_lst = [r + v for r, v in zip(reward_lst, valid_reward_lst)]
