@@ -243,6 +243,15 @@ class NaiveRewardManager:
                 reward_extra_info["overlong_reward"].extend(overlong_reward_lst)
                 reward_extra_info["overlong"].extend([o < 0 for o in overlong_reward_lst])
 
+        if self.config.custom_reward_function.valid_buffer.enable:
+            assert self.overlong_buffer_cfg.enable, "overlong_buffer_cfg.enable must be True if length_buffer.enable is True"
+            valid_penalty_factor = self.valid_buffer.penalty_factor
+            valid_ratio_lst = [valid_response_length[i] / expected_len if valid_response_length[i] <= expected_len else 0 for i in range(len(data))]
+            valid_reward_lst = [ratio * valid_penalty_factor for ratio in valid_ratio_lst]
+            reward_lst = [r + v for r, v in zip(reward_lst, valid_reward_lst)]
+            if self.config.custom_reward_function.valid_buffer.log:
+                reward_extra_info["valid_reward"].extend(valid_reward_lst)
+
         # fill reward tensor
         for i in range(len(data)):
             reward_tensor[i, valid_response_length[i] - 1] = reward_lst[i]

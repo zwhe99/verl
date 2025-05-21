@@ -186,6 +186,10 @@ custom_reward_function:
     ablation:
       enable: False
       direction: 0.0
+  valid_buffer:
+    enable: False # We try to avoid forgetting to set enable
+    penalty_factor: 0.0 # -1.0 means 'shorten' and 1.0 means 'lengthen'
+    log: False
 
 algorithm:
   gamma: 1.0
