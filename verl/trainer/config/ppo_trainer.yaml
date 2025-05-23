@@ -181,6 +181,7 @@ custom_reward_function:
     enable: False
     only_correct: False
     group_acc_mean: null
+    gam_param: null
     weight: 0.1
     sigmoid_param: 1
     ablation:

@@ -185,8 +185,14 @@ class NaiveRewardManager:
             #     group_acc_mean = self.config.custom_reward_function.length_reward.group_acc_mean
             # else:
             #     group_acc_mean = sum(group_acc_lst_mean) / len(group_acc_lst_mean)
+
             sigmoid_param = self.config.custom_reward_function.length_reward.sigmoid_param
-            sigmoid_gamma = [sigmoid_param * (group_acc - group_acc_mean) for group_acc in group_acc_lst_mean]
+            # sigmoid_gamma = [sigmoid_param * (group_acc - group_acc_mean) for group_acc in group_acc_lst_mean]
+
+            if self.config.custom_reward_function.length_reward.gam_param:
+                sigmoid_gamma = [sigmoid_param * (-self.config.custom_reward_function.length_reward.gam_param) for group_acc in group_acc_lst_mean]
+            else:
+                sigmoid_gamma = [sigmoid_param * (group_acc - group_acc_mean) for group_acc in group_acc_lst_mean]
 
             # standardize the response length for each group
             group_valid_response_length = [
