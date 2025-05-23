@@ -33,6 +33,7 @@ from verl.models.transformers.monkey_patch import apply_monkey_patch
 from verl.single_controller.base import Worker
 from verl.single_controller.base.decorator import Dispatch, register
 from verl.utils import hf_processor, hf_tokenizer
+from verl.utils.activation_offload import enable_activation_offloading
 from verl.utils.checkpoint.fsdp_checkpoint_manager import FSDPCheckpointManager
 from verl.utils.debug import log_gpu_memory_usage
 from verl.utils.flops_counter import FlopsCounter
@@ -160,6 +161,7 @@ class ActorRolloutRefWorker(Worker):
         trust_remote_code=False,
         use_liger=False,
         role="actor",
+        enable_activation_offload=False,
     ):
         from torch import optim
         from torch.distributed.fsdp import CPUOffload, MixedPrecision
@@ -308,6 +310,9 @@ class ActorRolloutRefWorker(Worker):
             actor_module_fsdp = actor_module
         else:
             raise NotImplementedError(f"not implement {fsdp_strategy}")
+
+        if enable_activation_offload:
+            enable_activation_offloading(actor_module_fsdp, fsdp_strategy, enable_gradient_checkpointing)
 
         log_gpu_memory_usage(f"After {role} FSDP init", logger=logger)
 
@@ -511,6 +516,7 @@ class ActorRolloutRefWorker(Worker):
                 trust_remote_code=self.config.model.get("trust_remote_code", False),
                 use_liger=self.config.model.get("use_liger", False),
                 role="actor",
+                enable_activation_offload=self.config.model.get("enable_activation_offload", False),
             )
 
             # get the original unwrapped module
@@ -587,9 +593,9 @@ class ActorRolloutRefWorker(Worker):
             metrics["perf/max_memory_reserved_gb"] = torch.cuda.max_memory_reserved() / (1024**3)
             metrics["perf/cpu_memory_used_gb"] = psutil.virtual_memory().used / (1024**3)
 
-            self.actor_lr_scheduler.step()
             lr = self.actor_lr_scheduler.get_last_lr()[0]
             metrics["actor/lr"] = lr
+            self.actor_lr_scheduler.step()
 
             # TODO: here, we should return all metrics
             output = DataProto(meta_info={"metrics": metrics})
@@ -899,6 +905,10 @@ class CriticWorker(Worker):
             fsdp2_load_full_state_dict(critic_module, full_state, fsdp_mesh, offload_policy)
         else:
             raise NotImplementedError(f"Unknown strategy {config.strategy}")
+
+        if config.model.get("enable_activation_offload", False):
+            enable_gradient_checkpointing = config.model.get("enable_gradient_checkpointing", False)
+            enable_activation_offloading(critic_module, config.strategy, enable_gradient_checkpointing)
 
         log_gpu_memory_usage("After critic FSDP", logger=None)
 
