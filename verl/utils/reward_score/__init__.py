@@ -15,6 +15,8 @@
 
 from verl.utils.import_utils import deprecated
 
+def is_ray_remote_function(func):
+    return hasattr(func, 'remote') and callable(func.remote)
 
 def default_compute_score(data_source, solution_str, ground_truth, extra_info=None, sandbox_fusion_url=None, concurrent_semaphore=None):
     """Compute the score for a given solution based on the data source.

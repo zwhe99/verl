@@ -19,7 +19,7 @@ from functools import partial
 import ray
 
 from verl import DataProto
-from verl.utils.reward_score import default_compute_score
+from verl.utils.reward_score import default_compute_score, is_ray_remote_function
 
 
 def get_custom_reward_fn(config):
@@ -51,8 +51,14 @@ def get_custom_reward_fn(config):
 
     reward_kwargs = dict(reward_fn_config.get("reward_kwargs", {}))
 
-    def wrapped_fn(*args, **kwargs):
-        return raw_fn(*args, **kwargs, **reward_kwargs)
+    if is_ray_remote_function(raw_fn):
+        @ray.remote
+        def wrapped_fn(*args, **kwargs):
+            raw_fn_ref = raw_fn.remote(*args, **kwargs, **reward_kwargs)
+            return ray.get(raw_fn_ref)
+    else:
+        def wrapped_fn(*args, **kwargs):
+            return raw_fn(*args, **kwargs, **reward_kwargs)
 
     return wrapped_fn
 

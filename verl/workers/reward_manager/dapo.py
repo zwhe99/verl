@@ -19,10 +19,8 @@ import ray
 from copy import deepcopy
 
 from verl import DataProto
-from verl.utils.reward_score import default_compute_score
+from verl.utils.reward_score import default_compute_score, is_ray_remote_function
 
-def is_ray_remote_function(func):
-    return hasattr(func, 'remote') and callable(func.remote)
 
 class DAPORewardManager:
     """The reward manager."""
