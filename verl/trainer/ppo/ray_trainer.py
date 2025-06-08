@@ -932,6 +932,7 @@ class RayPPOTrainer:
         from verl.utils.tracking import Tracking
 
         logger = Tracking(
+            entity_name=self.config.trainer.entity_name,
             project_name=self.config.trainer.project_name,
             experiment_name=self.config.trainer.experiment_name,
             default_backend=self.config.trainer.logger,
