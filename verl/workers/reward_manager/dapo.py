@@ -20,8 +20,10 @@ from copy import deepcopy
 
 from verl import DataProto
 from verl.utils.reward_score import default_compute_score, is_ray_remote_function
+from verl.workers.reward_manager import register
 
 
+@register("dapo")
 class DAPORewardManager:
     """The reward manager."""
 
