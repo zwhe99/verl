@@ -179,6 +179,23 @@ class NaiveRewardManager:
             group_acc_lst_mean = [sum(group_reward) / len(group_reward) for group_reward in group_acc_lst]
             # reward_extra_info["group_acc_lst_mean"] = group_acc_lst_mean
 
+            # mask for filter ratio
+            group_filter_ratio_mask = [0] * len(group_acc_lst_mean)
+            valid_data_with_indices = [(index, value) for index, value in enumerate(group_acc_lst_mean) if value not in [0.0, 1.0]]
+
+            print(f"=== valid data: {len(valid_data_with_indices)} of {len(group_acc_lst_mean)} ===")
+
+            valid_data_with_indices.sort(key=lambda x: x[1])  # Sort by value
+            k = int(len(valid_data_with_indices) * self.config.custom_reward_function.length_reward.filter_ratio)
+            items_to_keep = valid_data_with_indices[:k] + valid_data_with_indices[-k:]  # Keep k smallest and k largest
+            indices_to_keep = set([index for index, _ in items_to_keep])
+
+            print(f"=== keep data: {len(indices_to_keep)} of {len(valid_data_with_indices)} ===")
+
+            for index in indices_to_keep:
+                group_filter_ratio_mask[index] = 1
+            filter_ratio_mask = [gfr_mask for gfr_mask in group_filter_ratio_mask for _ in range(group_size)]
+
             # get the prompt-specific sigmoid_gamma using pass ratio
             group_acc_mean = sum(group_acc_lst_mean) / len(group_acc_lst_mean)
             # if self.config.custom_reward_function.length_reward.group_acc_mean:
@@ -233,7 +250,10 @@ class NaiveRewardManager:
                 else:
                     raise ValueError("Invalid direction value. Must be 0.0 (shorten) or 1.0 (lengthen).")
 
-            length_reward = [r * oc_mask * abla_mask for r, oc_mask, abla_mask in zip(length_reward_sigmoid, only_correct_mask, ablation_mask)]
+            length_reward = [
+                r * oc_mask * abla_mask * fr_mask
+                for r, oc_mask, abla_mask, fr_mask in zip(length_reward_sigmoid, only_correct_mask, ablation_mask, filter_ratio_mask)
+            ]
 
             reward_extra_info["length_reward"] = length_reward
             reward_lst = [r + l for r, l in zip(reward_lst, length_reward)]

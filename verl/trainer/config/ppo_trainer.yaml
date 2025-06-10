@@ -184,6 +184,7 @@ custom_reward_function:
     gam_param: null
     weight: 0.1
     sigmoid_param: 1
+    filter_ratio: 1.0
     ablation:
       enable: False
       direction: 0.0
