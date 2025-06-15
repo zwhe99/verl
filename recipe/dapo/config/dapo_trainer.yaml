@@ -9,6 +9,10 @@ defaults:
 data:
   gen_batch_size: ${data.train_batch_size}
 
+actor_rollout_ref:
+  actor:
+    max_grad_norm: 5.0
+
 reward_model:
   reward_manager: dapo
   overlong_buffer: 
