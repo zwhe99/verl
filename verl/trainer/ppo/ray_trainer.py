@@ -1039,8 +1039,8 @@ class RayPPOTrainer(object):
                                     else:
                                         new_batch.batch['token_level_rewards'] = new_batch.batch['token_level_scores']
 
-                            metrics['critic/trajectory_injection_num'] = len(std_zero_uids)
-                            print(f"# Trajectory injection: {len(std_zero_uids)}")
+                        metrics["critic/trajectory_injection_num"] = len(std_zero_uids)
+                        print(f"# Trajectory injection: {len(std_zero_uids)}")
 
                         kept_prompt_uids = [uid for uid, std in prompt_uid2metric_std.items() if std > 0]
                         num_prompt_in_batch += len(kept_prompt_uids)
