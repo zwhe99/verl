@@ -958,6 +958,8 @@ class RayPPOTrainer(object):
                         prompt_uid2metric_std = {}
                         for prompt_uid, metric_vals in prompt_uid2metric_vals.items():
                             prompt_uid2metric_std[prompt_uid] = np.std(metric_vals)
+                        std_zero_uids = [uid for uid, std in prompt_uid2metric_std.items() if std == 0]
+                        val_one_uids = [uid for uid in std_zero_uids if prompt_uid2metric_vals[uid][0] == 1]
 
                         if self.config.algorithm.traj_injection.enable:
                             max_prompt_length = new_batch.batch['prompts'].shape[-1]
@@ -970,7 +972,7 @@ class RayPPOTrainer(object):
 
                             # Note: All-correct group will also be injected here since we use std to filter.
                             # However, it will be filtered out later since its std is still 0.
-                            std_zero_uids = [uid for uid, std in prompt_uid2metric_std.items() if std == 0]
+                            # std_zero_uids = [uid for uid, std in prompt_uid2metric_std.items() if std == 0]
 
                             if len(std_zero_uids) == 0:
                                 pass
@@ -1039,8 +1041,14 @@ class RayPPOTrainer(object):
                                     else:
                                         new_batch.batch['token_level_rewards'] = new_batch.batch['token_level_scores']
 
-                        metrics["critic/trajectory_injection_num"] = len(std_zero_uids)
-                        print(f"# Trajectory injection: {len(std_zero_uids)}")
+                        metrics["critic/all_uids"] = len(prompt_uid2metric_std)
+                        print(f"# all_uids: {len(prompt_uid2metric_std)}")
+
+                        metrics["critic/std_zero_uids"] = len(std_zero_uids)
+                        print(f"# std_zero_uids: {len(std_zero_uids)}")
+
+                        metrics["critic/val_one_uids"] = len(val_one_uids)
+                        print(f"# val_one_uids: {len(val_one_uids)}")
 
                         kept_prompt_uids = [uid for uid, std in prompt_uid2metric_std.items() if std > 0]
                         num_prompt_in_batch += len(kept_prompt_uids)
