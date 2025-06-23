@@ -852,6 +852,8 @@ class RayPPOTrainer(object):
         batch = None
         num_prompt_in_batch = 0
         num_gen_batches = 0
+
+        group_acc_mean_pre = self.config.custom_reward_function.length_reward.moving_average.group_acc_mean_init
         for epoch in range(self.config.trainer.total_epochs):
             for batch_dict in self.train_dataloader:
                 metrics = {}
@@ -911,9 +913,10 @@ class RayPPOTrainer(object):
                         # we combine with rule-based rm
                         reward_extra_infos_dict: dict[str, list]
                         try:
-                            reward_result = self.reward_fn(new_batch, return_dict=True)
+                            reward_result = self.reward_fn(new_batch, return_dict=True, group_acc_mean_pre=group_acc_mean_pre)
                             reward_tensor = reward_result['reward_tensor']
                             reward_extra_infos_dict = reward_result['reward_extra_info']
+                            length_reward_infos_dict = reward_result["length_reward_info"]
                         except Exception as e:
                             print(f'Error in reward_fn: {e}')
                             reward_tensor = self.reward_fn(new_batch)
@@ -1088,6 +1091,11 @@ class RayPPOTrainer(object):
                                     train_batch_size -= 1
                                     traj_bsz = train_batch_size * self.config.actor_rollout_ref.rollout.n
                                 batch = batch[:traj_bsz]
+
+                        group_acc_mean_pre = length_reward_infos_dict["group_acc_mean_pre"]
+                        metrics["critic/group_acc_mean_pre"] = group_acc_mean_pre
+                        metrics["critic/group_acc_mean_orig"] = length_reward_infos_dict["group_acc_mean_orig"]
+                        metrics["critic/group_acc_mean"] = length_reward_infos_dict["group_acc_mean"]
 
                     # balance the number of valid tokens on each dp rank.
                     # Note that this breaks the order of data inside the batch.

@@ -185,6 +185,9 @@ custom_reward_function:
     weight: 0.1
     sigmoid_param: 1
     filter_ratio: 1.0
+    moving_average:
+      weight: 0.0
+      group_acc_mean_init: 1.0
     ablation:
       enable: False
       direction: 0.0
