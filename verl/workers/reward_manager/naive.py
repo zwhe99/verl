@@ -86,7 +86,7 @@ class NaiveRewardManager:
         data.batch['acc'] = torch.tensor(scores, dtype=torch.float32, device=prompt_ids.device)
         return scores
 
-    def __call__(self, data: DataProto, return_dict: bool = False):
+    def __call__(self, data: DataProto, return_dict: bool = False, group_acc_mean_pre: float = 1.0):
         if 'rm_scores' in data.batch.keys():
             if return_dict:
                 return {"reward": data.batch['rm_scores']}
@@ -94,7 +94,7 @@ class NaiveRewardManager:
                 return data.batch['rm_scores']
 
         if is_ray_remote_function(self.compute_score):
-            return self._call_reward_ray(data, return_dict)
+            return self._call_reward_ray(data, return_dict, group_acc_mean_pre)
         else:
             return self._call_reward(data, return_dict)
 
