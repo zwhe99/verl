@@ -1091,9 +1091,9 @@ class RayPPOTrainer(object):
                                     train_batch_size -= 1
                                     traj_bsz = train_batch_size * self.config.actor_rollout_ref.rollout.n
                                 batch = batch[:traj_bsz]
-
-                        group_acc_mean_pre = length_reward_infos_dict["group_acc_mean"]
+                                
                         metrics["critic/group_acc_mean_pre"] = group_acc_mean_pre
+                        group_acc_mean_pre = length_reward_infos_dict["group_acc_mean"]
                         metrics["critic/group_acc_mean_orig"] = length_reward_infos_dict["group_acc_mean_orig"]
                         metrics["critic/group_acc_mean"] = length_reward_infos_dict["group_acc_mean"]
 
