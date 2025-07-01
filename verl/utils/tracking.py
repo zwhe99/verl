@@ -36,7 +36,7 @@ class Tracking:
 
     supported_backend = ["wandb", "mlflow", "swanlab", "vemlp_wandb", "tensorboard", "console", "clearml"]
 
-    def __init__(self, project_name, experiment_name, default_backend: Union[str, List[str]] = "console", config=None):
+    def __init__(self, entity_name, project_name, experiment_name, run_id=None, default_backend: Union[str, List[str]] = "console", config=None):
         if isinstance(default_backend, str):
             default_backend = [default_backend]
         for backend in default_backend:
@@ -55,7 +55,11 @@ class Tracking:
             settings = None
             if config and config["trainer"].get("wandb_proxy", None):
                 settings = wandb.Settings(https_proxy=config["trainer"]["wandb_proxy"])
-            wandb.init(project=project_name, name=experiment_name, config=config, settings=settings)
+
+            if run_id is None:
+                wandb.init(entity=entity_name, project=project_name, name=experiment_name, config=config, settings=settings)
+            else:
+                wandb.init(entity=entity_name, project=project_name, name=experiment_name, config=config, settings=settings, id=run_id)
             self.logger["wandb"] = wandb
 
         if "mlflow" in default_backend:

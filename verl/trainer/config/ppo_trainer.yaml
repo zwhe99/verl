@@ -962,11 +962,17 @@ trainer:
     # Send signal to the target application's process group. We let the program to exit by itself.
     kill: none
 
+  # Entity name for experiment tracking (e.g., wandb)
+  entity_name: null
+
   # Project name for experiment tracking (e.g., wandb)
   project_name: verl_examples
 
   # Experiment name for run identification in tracking tools
   experiment_name: gsm8k
+
+  # Run ID for experiment tracking (e.g., wandb)
+  run_id: null
 
   # Logging backends to use: "console", "wandb", etc.
   logger: [ 'console', 'wandb' ]
