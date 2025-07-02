@@ -55,6 +55,8 @@ trainer:
   resume_path: null
   project_name: gsm8k-sft
   experiment_name: test
+  entity_name: null
+  run_id: null
   total_epochs: 4
   total_training_steps: null
   logger: [ 'console', 'wandb' ]

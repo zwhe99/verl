@@ -541,6 +541,8 @@ class FSDPSFTTrainer:
             tracking = Tracking(
                 project_name=self.config.trainer.project_name,
                 experiment_name=self.config.trainer.experiment_name,
+                entity_name=self.config.trainer.entity_name,
+                run_id=self.config.trainer.run_id,
                 default_backend=self.config.trainer.logger,
             )
 

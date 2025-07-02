@@ -406,6 +406,8 @@ trainer:
   profile_steps: null # [1,2,5] or [] or null
   project_name: verl_examples
   experiment_name: gsm8k
+  entity_name: null
+  run_id: null
   logger: ['console', 'wandb']
   log_val_generations: 0
   nnodes: 1
