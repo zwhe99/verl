@@ -18,6 +18,7 @@ reward_model:
       len: 0
       penalty_factor: 0.0
       log: False
+    max_resp_len: ${data.max_response_length}
 
 algorithm:
   filter_groups:
