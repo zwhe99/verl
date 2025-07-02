@@ -13,7 +13,7 @@ data:
 reward_model:
   reward_manager: dapo
   reward_kwargs:
-    overlong_buffer: 
+    overlong_buffer_cfg: 
       enable: False # We try to avoid forgetting to set enable
       len: 0
       penalty_factor: 0.0
