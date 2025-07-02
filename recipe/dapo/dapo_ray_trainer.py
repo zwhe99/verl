@@ -111,16 +111,16 @@ class RayDAPOTrainer(RayPPOTrainer):
                 new_batch: DataProto = DataProto.from_single_dict(batch_dict)
                 num_gen_batches += 1
                 # pop those keys for generation
+                non_tensor_batch_keys = ["raw_prompt_ids"]
                 if "multi_modal_data" in new_batch.non_tensor_batch.keys():
-                    gen_batch = new_batch.pop(
-                        batch_keys=["input_ids", "attention_mask", "position_ids"],
-                        non_tensor_batch_keys=["raw_prompt_ids", "multi_modal_data"],
-                    )
-                else:
-                    gen_batch = new_batch.pop(
-                        batch_keys=["input_ids", "attention_mask", "position_ids"],
-                        non_tensor_batch_keys=["raw_prompt_ids"],
-                    )
+                    non_tensor_batch_keys.append("multi_modal_data")
+                if "raw_prompt" in new_batch.non_tensor_batch.keys():
+                    non_tensor_batch_keys.append("raw_prompt")
+
+                gen_batch = new_batch.pop(
+                    batch_keys=["input_ids", "attention_mask", "position_ids"],
+                    non_tensor_batch_keys=non_tensor_batch_keys,
+                )
 
                 is_last_step = self.global_steps >= self.total_training_steps
 
