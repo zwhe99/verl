@@ -108,7 +108,8 @@ class NaiveRewardManager:
         data_source_lst = [data[i].non_tensor_batch[self.reward_fn_key] for i in range(len(data))]
         # print(data[0].non_tensor_batch.keys()) # dict_keys(['data_source', 'ability', 'reward_model', 'extra_info', 'r1_content', 'r1_reasoning_content', 'r1', 'r1_with_ans_label', 'index', 'uid'])
         print("="*100)
-        print(data[0].non_tensor_batch)
+        import json
+        print([json.dumps(data[0].non_tensor_batch)])
         print("="*100)
         exit(0)
 
