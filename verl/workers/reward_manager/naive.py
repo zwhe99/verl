@@ -106,6 +106,8 @@ class NaiveRewardManager:
 
         # get data source list
         data_source_lst = [data[i].non_tensor_batch[self.reward_fn_key] for i in range(len(data))]
+        print(data[i].non_tensor_batch.keys())
+        exit(0)
 
         # get prompt str list
         prompt_ids = data.batch['prompts']
