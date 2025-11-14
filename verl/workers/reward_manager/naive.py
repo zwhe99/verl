@@ -202,6 +202,41 @@ class NaiveRewardManager:
             reward_extra_info["length_reward"] = length_reward
             reward_lst = [r + l for r, l in zip(reward_lst, length_reward)]
 
+        if self.config.custom_reward_function.length_reward.ablation.shortrl:
+            group_size = self.config.actor_rollout_ref.rollout.n
+            group_valid_response_length = [
+                valid_response_length[i : i + group_size] for i in range(0, len(valid_response_length), group_size)
+            ]
+            lambda_lst = []
+            max_len_lst, min_len_lst = [], []
+            for gvr_len in group_valid_response_length:
+                max_len, min_len = max(gvr_len), min(gvr_len)
+                max_len_lst.append([max_len] * group_size)
+                min_len_lst.append([min_len] * group_size)
+                if max_len == min_len:
+                    lambda_lst.extend([0] * group_size)
+                else:
+                    for l in gvr_len:
+                        lambda_lst.append(0.5 - ((l - min_len) / (max_len - min_len)))
+                        
+            beta_lst = []
+            for _lambda, _length, _min_len in zip(lambda_lst, valid_response_length, min_len_lst):
+                if _length > _min_len + 100:
+                    beta_lst.append(_lambda)
+                else:
+                    beta_lst.append(0.5)
+                    
+            length_reward = []
+            for _acc, _beta in zip(acc_lst, beta_lst):
+                if _acc == 1.0:
+                    length_reward.append(_beta)
+                elif _acc == 0.0:
+                    length_reward.append(0)
+                else:
+                    raise ValueError("Invalid acc value. Must be 0.0 or 1.0.")
+                
+            reward_extra_info["length_reward"] = length_reward
+            reward_lst = [r + l for r, l in zip(reward_lst, length_reward)]
 
         if self.config.custom_reward_function.length_reward.enable:
             # compute pass ratio for each group
