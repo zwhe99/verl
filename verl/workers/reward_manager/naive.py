@@ -211,8 +211,8 @@ class NaiveRewardManager:
             max_len_lst, min_len_lst = [], []
             for gvr_len in group_valid_response_length:
                 max_len, min_len = max(gvr_len), min(gvr_len)
-                max_len_lst.append([max_len] * group_size)
-                min_len_lst.append([min_len] * group_size)
+                max_len_lst.extend([max_len] * group_size)
+                min_len_lst.extend([min_len] * group_size)
                 if max_len == min_len:
                     lambda_lst.extend([0] * group_size)
                 else:
