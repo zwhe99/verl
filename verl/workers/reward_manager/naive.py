@@ -312,6 +312,7 @@ class NaiveRewardManager:
                 only_correct_mask = acc_lst
             else:
                 only_correct_mask = [1] * len(acc_lst)
+                filter_ratio_mask = [1] * len(acc_lst) # !!! disable filter ratio when not only_correct
 
             # mask for ablation samples
             # 0.0: shorten, 1.0: lengthen
@@ -332,8 +333,7 @@ class NaiveRewardManager:
             reward_extra_info["length_reward"] = length_reward
             reward_lst = [r + l for r, l in zip(reward_lst, length_reward)]
 
-        for i in range(0, len(reward_lst), group_size):
-            reward_extra_info["final_reward"].append(reward_lst[i:i+group_size])
+        reward_extra_info["final_reward"] = reward_lst[:]
 
         if self.overlong_buffer_cfg.enable:
             overlong_buffer_len = self.overlong_buffer_cfg.len
@@ -378,10 +378,6 @@ class NaiveRewardManager:
                 else:
                     print(f"[score]", score_lst[i])
 
-        print(f"acc")
-        print(reward_extra_info["acc"])
-        print(f"final_reward")
-        print(reward_extra_info["final_reward"])
         if return_dict:
             return {
                 "reward_tensor": reward_tensor,
