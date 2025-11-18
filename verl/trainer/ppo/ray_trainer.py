@@ -957,6 +957,7 @@ class RayPPOTrainer(object):
                         for uid, metric_val in zip(new_batch.non_tensor_batch['uid'],
                                                    new_batch.non_tensor_batch[metric_name]):
                             prompt_uid2metric_vals[uid].append(metric_val)
+                        print(prompt_uid2metric_vals)
 
                         prompt_uid2metric_std = {}
                         for prompt_uid, metric_vals in prompt_uid2metric_vals.items():
