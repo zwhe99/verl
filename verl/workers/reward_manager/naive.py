@@ -378,6 +378,10 @@ class NaiveRewardManager:
                 else:
                     print(f"[score]", score_lst[i])
 
+        print(f"acc")
+        print(reward_extra_info["acc"])
+        print(f"final_reward")
+        print(reward_extra_info["final_reward"])
         if return_dict:
             return {
                 "reward_tensor": reward_tensor,
