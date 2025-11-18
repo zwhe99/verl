@@ -332,6 +332,9 @@ class NaiveRewardManager:
             reward_extra_info["length_reward"] = length_reward
             reward_lst = [r + l for r, l in zip(reward_lst, length_reward)]
 
+        for i in range(0, len(reward_lst), group_size):
+            reward_extra_info["final_reward"].append(reward_lst[i:i+group_size])
+
         if self.overlong_buffer_cfg.enable:
             overlong_buffer_len = self.overlong_buffer_cfg.len
             expected_len = self.max_resp_len - overlong_buffer_len
