@@ -106,9 +106,6 @@ class NaiveRewardManager:
 
         # get data source list
         data_source_lst = [data[i].non_tensor_batch[self.reward_fn_key] for i in range(len(data))]
-        if "difficulty" in data[0].non_tensor_batch.keys():
-            data_difficulty_lst = [data[i].non_tensor_batch['difficulty'] for i in range(len(data))]
-        print(data_difficulty_lst)
         # print(data[0].non_tensor_batch.keys()) # dict_keys(['data_source', 'ability', 'reward_model', 'extra_info', 'r1_content', 'r1_reasoning_content', 'r1', 'r1_with_ans_label', 'index', 'uid'])
         # data_difficulty_lst = [data[i].non_tensor_batch['extra_info']['difficulty'] for i in range(len(data))]
         # data_difficulty_mean = 6.0
@@ -287,6 +284,10 @@ class NaiveRewardManager:
                 sigmoid_gamma = [sigmoid_param * (-self.config.custom_reward_function.length_reward.gam_param) for group_acc in group_acc_lst_mean]
             else:
                 sigmoid_gamma = [sigmoid_param * (group_acc - group_acc_mean) for group_acc in group_acc_lst_mean]
+                
+            if self.config.custom_reward_function.length_reward.ablation.data_difficulty > 0.0:
+                data_difficulty_lst = [data[i].non_tensor_batch['difficulty'] for i in range(len(data)) if i % group_size == 0]
+                sigmoid_gamma = [sigmoid_param / 8 * (diff - self.config.custom_reward_function.length_reward.ablation.data_difficulty) for diff in data_difficulty_lst]
 
             # standardize the response length for each group
             group_valid_response_length = [
